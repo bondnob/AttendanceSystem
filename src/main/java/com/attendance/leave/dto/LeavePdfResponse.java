@@ -1,0 +1,11 @@
+package com.attendance.leave.dto;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class LeavePdfResponse {
+
+    private String pdfUrl;
+}
