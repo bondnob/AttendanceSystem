@@ -880,7 +880,7 @@ public class LeaveService {
                                                                       ApprovalRuleStep currentRuleStep) {
         List<UserAccount> candidates = switch (determineSelectionScenario(request)) {
             case SICK_WITHIN_MONTH -> findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER));
-            case SICK_OVER_MONTH, PERSONAL_10_TO_30 -> findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER));
+            case SICK_OVER_MONTH, PERSONAL_10_TO_30 -> findEnabledUsersByRoles(resolveStationmasterCandidateRoles(request));
             case PERSONAL_OVER_30 -> findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER, RoleCode.PARTY_SECRETARY));
             case NONE -> List.of();
         };
@@ -896,6 +896,14 @@ public class LeaveService {
                         .candidateGroup(resolveCandidateGroupByRole(user.getRoleCode()))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private List<String> resolveStationmasterCandidateRoles(LeaveRequest request) {
+        if (APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(request.getApplicantType())
+                || POSITION_SECTION_LEVEL.equals(request.getPositionLevelCode())) {
+            return List.of(RoleCode.STATIONMASTER, RoleCode.PARTY_SECRETARY);
+        }
+        return List.of(RoleCode.STATIONMASTER);
     }
 
     private List<UserAccount> findEnabledUsersByRoles(List<String> roleCodes) {
@@ -975,6 +983,9 @@ public class LeaveService {
     }
 
     private boolean matchesApprovalPermission(ApprovalPermission permission, LeaveRequest request, String leaveScope) {
+        if (canApproveSectionLevelSickOverMonth(permission, request, leaveScope)) {
+            return true;
+        }
         if (permission.getApplicantType() != null
                 && !permission.getApplicantType().equals(resolveRuleApplicantType(request.getApplicantType()))) {
             return false;
@@ -999,6 +1010,16 @@ public class LeaveService {
             }
         }
         return true;
+    }
+
+    private boolean canApproveSectionLevelSickOverMonth(ApprovalPermission permission, LeaveRequest request, String leaveScope) {
+        return (RoleCode.STATIONMASTER.equals(permission.getRoleCode())
+                || RoleCode.PARTY_SECRETARY.equals(permission.getRoleCode()))
+                && APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(request.getApplicantType())
+                && POSITION_SECTION_LEVEL.equals(request.getPositionLevelCode())
+                && LEAVE_SCOPE_SICK.equals(leaveScope)
+                && request.getLeaveDays() != null
+                && request.getLeaveDays().compareTo(DAY_30) > 0;
     }
 
     private String resolveRuleApplicantType(String applicantType) {
@@ -1065,10 +1086,6 @@ public class LeaveService {
                                          List<ApprovalRecordResponse> approvals) {
         if (!LeaveRequestStatus.APPROVED.equals(request.getStatus()) || request.getFinalApprovedAt() == null) {
             return null;
-        }
-        String existingPdfUrl = leaveDocumentService.resolveExistingPdfUrl(request.getId());
-        if (existingPdfUrl != null) {
-            return existingPdfUrl;
         }
         LeaveDetailResponse detail = LeaveDetailResponse.builder()
                 .id(request.getId())

@@ -5,16 +5,19 @@ import com.attendance.admin.model.OrgUnit;
 import com.attendance.exception.BizException;
 import com.attendance.leave.dto.ApprovalRecordResponse;
 import com.attendance.leave.dto.LeaveDetailResponse;
+import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Image;
 import com.lowagie.text.pdf.BaseFont;
 import com.lowagie.text.pdf.ColumnText;
 import com.lowagie.text.pdf.PdfContentByte;
 import com.lowagie.text.pdf.PdfGState;
+import com.lowagie.text.pdf.PdfImportedPage;
 import com.lowagie.text.pdf.PdfReader;
-import com.lowagie.text.pdf.PdfStamper;
+import com.lowagie.text.pdf.PdfWriter;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -37,9 +40,6 @@ import org.springframework.stereotype.Service;
 public class LeaveDocumentService {
 
     private static final String APPLICANT_TYPE_EMPLOYEE = "EMPLOYEE";
-    private static final String APPLICANT_TYPE_GENERAL_CADRE = "GENERAL_CADRE";
-    private static final String APPLICANT_TYPE_SECTION_LEVEL_CADRE = "SECTION_LEVEL_CADRE";
-    private static final String APPLICANT_TYPE_CADRE = "CADRE";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String EMPLOYEE_TEMPLATE = "docs/职工请假记录单.pdf";
@@ -48,7 +48,6 @@ public class LeaveDocumentService {
     private static final float DECISION_FONT_SIZE = 16f;
     private static final float SIGNATURE_WIDTH = 72f;
     private static final float SIGNATURE_HEIGHT = 56f;
-    private static final float SIGNATURE_GAP = 32f;
     private static final float SIGNATURE_Y_OFFSET = -3f;
     private static final float SIGNATURE_X_OFFSET = 82f;
     private static final BigDecimal DAY_10 = BigDecimal.TEN;
@@ -66,12 +65,19 @@ public class LeaveDocumentService {
         try {
             Path directory = Paths.get(fileStoragePath, "leave-pdfs");
             Files.createDirectories(directory);
+            deleteExistingPdfs(directory, leaveId);
             Path target = directory.resolve(buildPdfFileName(leaveId, detail.getFinalApprovedAt()));
-            try (PdfReader reader = new PdfReader(resolveTemplatePath(detail).toString());
-                 OutputStream outputStream = Files.newOutputStream(target);
-                 PdfStamper stamper = new PdfStamper(reader, outputStream)) {
-                PdfContentByte canvas = stamper.getOverContent(1);
+            Path templatePath = resolveTemplatePath(detail);
+            try (PdfReader reader = new PdfReader(templatePath.toString());
+                 OutputStream outputStream = Files.newOutputStream(target)) {
+                Document document = new Document(reader.getPageSizeWithRotation(1));
+                PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+                document.open();
+                PdfContentByte canvas = writer.getDirectContent();
+                PdfImportedPage templatePage = writer.getImportedPage(reader, 1);
+                canvas.addTemplate(templatePage, 0, 0);
                 writeOverlay(canvas, detail);
+                document.close();
             }
             return "/files/leave-pdfs/" + target.getFileName();
         } catch (IOException | DocumentException ex) {
@@ -98,8 +104,30 @@ public class LeaveDocumentService {
 
     private void writeOverlay(PdfContentByte canvas, LeaveDetailResponse detail) throws IOException, DocumentException {
         BaseFont font = loadChineseBaseFont();
-        float orgNameX = APPLICANT_TYPE_EMPLOYEE.equals(detail.getApplicantType()) ? 226 : 190;
-        writeText(canvas, font, 12, resolveOrgName(detail.getOrgUnitId()), orgNameX, 666);
+        if (!usesEmployeePdfLayout(detail)) {
+            writeCadreOverlay(canvas, font, detail);
+            return;
+        }
+        writeText(canvas, font, 12, resolveOrgName(detail.getOrgUnitId()), 226, 666);
+        writeCenteredText(canvas, font, 10.5f, safe(detail.getJobTitleSnapshot()), 67, 121, 632);
+        writeCenteredText(canvas, font, 10.5f, safe(detail.getApplicantName()), 121, 175, 632);
+        writeCenteredText(canvas, font, 10.5f, safe(detail.getLeaveTypeName()), 175, 229, 632);
+        writeCenteredText(canvas, font, 10.5f, formatDateRange(detail.getStartTime(), detail.getEndTime()), 229, 402, 632);
+        writeCenteredText(canvas, font, 10.5f, formatDays(detail.getLeaveDays()), 402, 471, 632);
+        writeCenteredText(canvas, font, 10.5f, safe(detail.getRemark()), 471, 528, 632);
+        writeMultilineText(canvas, font, 11, safe(detail.getReason()), 128, 611, 390, 15);
+        writeText(canvas, font, 11, safe(detail.getApplicantName()), 356, 554);
+        writeDateSplit(canvas, font, detail.getSubmittedAt(), 410, 454, 478, 554);
+
+        List<ApprovalSlot> slots = resolveApprovalSlots(detail);
+        for (ApprovalSlot slot : slots) {
+            writeApprovalSlot(canvas, font, slot);
+        }
+    }
+
+    private void writeCadreOverlay(PdfContentByte canvas, BaseFont font, LeaveDetailResponse detail)
+            throws IOException, DocumentException {
+        writeText(canvas, font, 12, resolveOrgName(detail.getOrgUnitId()), 196, 666);
         writeCenteredText(canvas, font, 10.5f, safe(detail.getJobTitleSnapshot()), 67, 121, 632);
         writeCenteredText(canvas, font, 10.5f, safe(detail.getApplicantName()), 121, 175, 632);
         writeCenteredText(canvas, font, 10.5f, safe(detail.getLeaveTypeName()), 175, 229, 632);
@@ -190,7 +218,7 @@ public class LeaveDocumentService {
 
     private Path resolveTemplatePath(LeaveDetailResponse detail) {
         String relativePath;
-        if (APPLICANT_TYPE_EMPLOYEE.equals(detail.getApplicantType())) {
+        if (usesEmployeePdfLayout(detail)) {
             relativePath = isPersonalLeaveOver30Days(detail) ? EMPLOYEE_PERSONAL_OVER_30_TEMPLATE : EMPLOYEE_TEMPLATE;
         } else {
             relativePath = CADRE_TEMPLATE;
@@ -200,6 +228,10 @@ public class LeaveDocumentService {
             throw new BizException("请假单模板不存在，查找路径: " + buildLookupMessage(relativePath));
         }
         return template;
+    }
+
+    private boolean usesEmployeePdfLayout(LeaveDetailResponse detail) {
+        return APPLICANT_TYPE_EMPLOYEE.equals(detail.getApplicantType());
     }
 
     private Path findProjectFile(String relativePath) {
@@ -255,17 +287,18 @@ public class LeaveDocumentService {
     private Image loadSignatureImage(String signatureUrl) {
         String newSignatureUrl = normalizeSignatureUrl(signatureUrl);
         log.info("loadSignatureImage: " + newSignatureUrl);
-        if (newSignatureUrl == null || newSignatureUrl.isBlank() || !newSignatureUrl.startsWith("/files/")) {
+        if (newSignatureUrl == null || newSignatureUrl.isBlank()) {
             return null;
         }
         try {
-            String relativePath = newSignatureUrl.substring("/files/".length()).replace("/", java.io.File.separator);
-            Path path = Paths.get(fileStoragePath).resolve(relativePath);
-            if (!Files.exists(path)) {
+            Path path = resolveSignaturePath(newSignatureUrl);
+            if (path == null) {
+                log.warn("signature image not found: {}", newSignatureUrl);
                 return null;
             }
             return Image.getInstance(path.toAbsolutePath().toString());
         } catch (Exception ex) {
+            log.warn("load signature image failed: {}", newSignatureUrl, ex);
             return null;
         }
     }
@@ -274,22 +307,99 @@ public class LeaveDocumentService {
         if (signatureUrl == null || signatureUrl.isBlank() || "undefined".equalsIgnoreCase(signatureUrl.trim())) {
             return null;
         }
-        return signatureUrl.trim().replace("http://192.168.1.10:8080", "");
+        return signatureUrl.trim().replace("http://121.41.90.50", "");
+    }
+
+    private Path resolveSignaturePath(String signatureUrl) {
+        String normalized = extractPath(signatureUrl);
+        if (normalized.startsWith("/files/")) {
+            normalized = normalized.substring("/files/".length());
+        } else if (normalized.startsWith("files/")) {
+            normalized = normalized.substring("files/".length());
+        } else if (normalized.startsWith("/")) {
+            normalized = normalized.substring(1);
+        }
+        normalized = normalized.replace("\\", "/");
+
+        List<Path> candidates = new ArrayList<>();
+        Path directPath = Paths.get(normalized);
+        if (directPath.isAbsolute()) {
+            candidates.add(directPath);
+        }
+        candidates.add(Paths.get(fileStoragePath).resolve(normalized));
+        for (Path baseDir : collectLookupBaseDirs()) {
+            candidates.add(baseDir.resolve(fileStoragePath).resolve(normalized));
+            candidates.add(baseDir.resolve(normalized));
+        }
+
+        for (Path candidate : candidates) {
+            Path path = candidate.normalize();
+            if (Files.exists(path)) {
+                return path;
+            }
+        }
+        return null;
+    }
+
+    private String extractPath(String url) {
+        String trimmed = url.trim();
+        if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            try {
+                return URI.create(trimmed).getPath();
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return trimmed;
     }
 
     private BaseFont loadChineseBaseFont() throws IOException, DocumentException {
         String[] candidates = new String[]{
+                "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc,0",
+                "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
+                "/usr/share/fonts/wqy-microhei/wqy-microhei.ttc",
+
+                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+                "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc,0",
+                "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc,0",
+
                 "C:/Windows/Fonts/simsun.ttc,0",
                 "C:/Windows/Fonts/simhei.ttf",
                 "C:/Windows/Fonts/msyh.ttc,0"
         };
+
         for (String candidate : candidates) {
             try {
-                return BaseFont.createFont(candidate, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+                BaseFont font = BaseFont.createFont(candidate, BaseFont.IDENTITY_H, BaseFont.EMBEDDED);
+                log.info("use pdf chinese font: {}", candidate);
+                return font;
             } catch (Exception ignored) {
             }
         }
-        throw new BizException("未找到可用中文字体，无法生成 PDF");
+
+        try {
+            BaseFont font = BaseFont.createFont("STSong-Light", "UniGB-UCS2-H", BaseFont.NOT_EMBEDDED);
+            log.info("use pdf chinese font: STSong-Light");
+            return font;
+        } catch (Exception ex) {
+            throw new BizException("未找到可用中文字体，无法生成 PDF");
+        }
+    }
+
+    private void deleteExistingPdfs(Path directory, Long leaveId) throws IOException {
+        if (leaveId == null || !Files.exists(directory)) {
+            return;
+        }
+        try (var paths = Files.list(directory)) {
+            paths.filter(path -> path.getFileName().toString().startsWith("leave_" + leaveId + "_"))
+                    .forEach(path -> {
+                        try {
+                            Files.deleteIfExists(path);
+                        } catch (IOException ex) {
+                            log.warn("delete existing leave pdf failed: {}", path, ex);
+                        }
+                    });
+        }
     }
 
     private String resolveOrgName(Long orgUnitId) {
@@ -303,10 +413,16 @@ public class LeaveDocumentService {
     private List<ApprovalSlot> resolveApprovalSlots(LeaveDetailResponse detail) {
         List<ApprovalRecordResponse> approvals = detail.getApprovals() == null ? List.of() : detail.getApprovals();
         List<ApprovalSlot> slots = new ArrayList<>();
-        if (APPLICANT_TYPE_EMPLOYEE.equals(detail.getApplicantType())) {
+        if (usesEmployeePdfLayout(detail)) {
             ApprovalRecordResponse unitLeader = findApprovalByRole(approvals, "UNIT_LEADER");
-            slots.add(new ApprovalSlot(67, 541, 295, 463, safe(detail.getTeamLeaderSnapshot()), detail.getSubmittedAt(), null, 176, 220, 244, 467, 0));
-            slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "ORG_PRINCIPAL"), 410, 454, 478, 467, 505));
+            ApprovalRecordResponse orgPrincipal = findApprovalByRole(approvals, "ORG_PRINCIPAL");
+            if (isPersonalLeaveOver30Days(detail)) {
+                slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505));
+            } else {
+                slots.add(new ApprovalSlot(67, 541, 295, 463, safe(detail.getTeamLeaderSnapshot()), detail.getSubmittedAt(), null, 176, 220, 244, 467, 0));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505));
+            }
             if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && unitLeader != null) {
                 slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, unitLeader, 176, 220, 244, 388, 426));
                 slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426));
@@ -318,8 +434,8 @@ public class LeaveDocumentService {
         }
         ApprovalRecordResponse orgPrincipal = findApprovalByRole(approvals, "ORG_PRINCIPAL");
         ApprovalRecordResponse second = approvals.size() > 1 ? approvals.get(1) : null;
-        ApprovalRecordResponse stationmaster = findApprovalByRole(approvals, "STATIONMASTER");
-        ApprovalRecordResponse partySecretary = findApprovalByRole(approvals, "PARTY_SECRETARY");
+        ApprovalRecordResponse stationmaster = findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长");
+        ApprovalRecordResponse partySecretary = findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
         slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505));
         slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, second, 410, 454, 478, 467, 505));
         slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmaster, 176, 220, 244, 388, 426));
@@ -330,6 +446,16 @@ public class LeaveDocumentService {
     private ApprovalRecordResponse findApprovalByRole(List<ApprovalRecordResponse> approvals, String roleCode) {
         return approvals.stream()
                 .filter(item -> roleCode.equals(item.getApproverRoleCode()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private ApprovalRecordResponse findApprovalByRoleOrName(List<ApprovalRecordResponse> approvals,
+                                                            String roleCode,
+                                                            String roleName) {
+        return approvals.stream()
+                .filter(item -> roleCode.equals(item.getApproverRoleCode())
+                        || roleName.equals(item.getApproverRoleName()))
                 .findFirst()
                 .orElse(null);
     }
@@ -371,7 +497,8 @@ public class LeaveDocumentService {
     }
 
     private String buildPdfFileName(Long leaveId, LocalDateTime approvedAt) {
-        return "leave_" + leaveId + "_" + approvedAt.format(FILE_TIME_FORMATTER) + ".pdf";
+        return "leave_" + leaveId + "_" + approvedAt.format(FILE_TIME_FORMATTER)
+                + "_" + LocalDateTime.now().format(FILE_TIME_FORMATTER) + ".pdf";
     }
 
     private String formatDateRange(LocalDateTime startTime, LocalDateTime endTime) {
