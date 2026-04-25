@@ -1067,15 +1067,15 @@ CREATE TABLE `org_unit`  (
 -- ----------------------------
 -- Records of org_unit
 -- ----------------------------
-INSERT INTO `org_unit` VALUES (1, 'D09', '领导人员', 'DEPARTMENT', 1, 1, '2026-04-17 23:26:25', '2026-04-19 10:55:57');
-INSERT INTO `org_unit` VALUES (2, 'D01', '办公室（党委办公室）', 'DEPARTMENT', 2, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (3, 'D02', '党群工作科（融媒体工作室）', 'DEPARTMENT', 3, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (4, 'D03', '劳动人事科（党委组织科）', 'DEPARTMENT', 4, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (5, 'D04', '财务收入科', 'DEPARTMENT', 5, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (6, 'D05', '职工培训科', 'DEPARTMENT', 6, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (7, 'D06', '运输业务科', 'DEPARTMENT', 7, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (8, 'D07', '技术科', 'DEPARTMENT', 8, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
-INSERT INTO `org_unit` VALUES (9, 'D08', '安全科（武装保卫科）', 'DEPARTMENT', 9, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (1, 'D01', '领导人员', 'DEPARTMENT', 1, 1, '2026-04-17 23:26:25', '2026-04-19 10:55:57');
+INSERT INTO `org_unit` VALUES (2, 'D02', '办公室（党委办公室）', 'DEPARTMENT', 2, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (3, 'D03', '党群工作科（融媒体工作室）', 'DEPARTMENT', 3, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (4, 'D04', '劳动人事科（党委组织科）', 'DEPARTMENT', 4, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (5, 'D05', '财务收入科', 'DEPARTMENT', 5, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (6, 'D06', '职工培训科', 'DEPARTMENT', 6, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (7, 'D07', '运输业务科', 'DEPARTMENT', 7, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (8, 'D08', '技术科', 'DEPARTMENT', 8, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
+INSERT INTO `org_unit` VALUES (9, 'D09', '安全科（武装保卫科）', 'DEPARTMENT', 9, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
 INSERT INTO `org_unit` VALUES (10, 'W01', '运转一车间', 'WORKSHOP', 10, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
 INSERT INTO `org_unit` VALUES (11, 'W02', '运转二车间', 'WORKSHOP', 11, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');
 INSERT INTO `org_unit` VALUES (12, 'W03', '运转三车间', 'WORKSHOP', 12, 1, '2026-04-17 11:44:34', '2026-04-17 23:33:07');

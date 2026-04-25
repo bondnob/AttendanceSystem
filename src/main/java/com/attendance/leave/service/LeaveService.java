@@ -139,7 +139,7 @@ public class LeaveService {
         request.setOrgUnitId(applicant.getOrgUnitId());
         request.setLeaveTypeId(leaveType.getId());
         request.setApprovalRuleId(rule.getId());
-        request.setApplicantNameSnapshot(applicant.getEmpName());
+        request.setApplicantNameSnapshot(resolveApplicantNameSnapshot(applicantType, applicant, dto));
         request.setApplicantType(applicantType);
         request.setPositionLevelCode(resolvePositionLevel(applicantType, applicant.getPositionLevelCode()));
         request.setJobTitleSnapshot(dto.getJobTitle().trim());
@@ -1159,6 +1159,15 @@ public class LeaveService {
             }
         }
         return requireUser(dto.getApplicantId());
+    }
+
+    private String resolveApplicantNameSnapshot(String applicantType, UserAccount applicant, CreateLeaveRequestDto dto) {
+        String inputName = dto.getApplicantName() == null ? null : dto.getApplicantName().trim();
+        if ((APPLICANT_TYPE_EMPLOYEE.equals(applicantType) || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType))
+                && inputName != null && !inputName.isBlank()) {
+            return inputName;
+        }
+        return applicant.getEmpName();
     }
 
     private UserAccount requireUser(Long userId) {
