@@ -4,6 +4,8 @@ import com.attendance.common.ApiResponse;
 import com.attendance.common.PageResponse;
 import com.attendance.leave.dto.ApproveLeaveWithSignatureDto;
 import com.attendance.leave.dto.ApprovalSignatureUploadResponse;
+import com.attendance.leave.dto.BatchLeavePdfRequest;
+import com.attendance.leave.dto.BatchLeavePdfResponse;
 import com.attendance.leave.dto.CancelLeaveRequestDto;
 import com.attendance.leave.dto.BatchApproveLeaveDto;
 import com.attendance.leave.dto.BatchApproveLeaveResponse;
@@ -42,14 +44,28 @@ public class LeaveController {
         return ApiResponse.success("请假记录单提交成功", leaveService.createLeave(request));
     }
 
-    @Operation(summary = "审批请假单", description = "处理审批节点，并同步上传电子签名。")
+    @Operation(summary = "修改驳回请假单", description = "考勤管理员可以修改本人发起且已驳回的请假单，系统会重新提交并重建审批流。")
+    @PutMapping("/{leaveId}")
+    public ApiResponse<LeaveDetailResponse> updateRejectedLeave(@PathVariable Long leaveId,
+                                                                @Valid @RequestBody CreateLeaveRequestDto request) {
+        return ApiResponse.success("请假记录单修改并重新提交成功", leaveService.updateRejectedLeave(leaveId, request));
+    }
+
+    @Operation(summary = "删除驳回请假单", description = "考勤管理员可以删除本人发起且已驳回的请假单。")
+    @DeleteMapping("/{leaveId}")
+    public ApiResponse<Void> deleteRejectedLeave(@PathVariable Long leaveId) {
+        leaveService.deleteRejectedLeave(leaveId);
+        return ApiResponse.success("驳回请假单删除成功", null);
+    }
+
+    @Operation(summary = "审批请假单", description = "处理审批节点，审批签名仅使用超级管理员预先为当前账号配置的电子签名。")
     @PostMapping("/{leaveId}/approve")
     public ApiResponse<LeaveDetailResponse> approve(@PathVariable Long leaveId,
                                                     @Valid @ModelAttribute ApproveLeaveWithSignatureDto request) {
         return ApiResponse.success("审批完成", leaveService.approve(leaveId, request));
     }
 
-    @Operation(summary = "批量审批请假单", description = "对当前账号能够处理的多张请假单进行一键审批，并复用一次上传的电子签名。")
+    @Operation(summary = "批量审批请假单", description = "对当前账号能够处理的多张请假单进行一键审批，审批签名仅使用超级管理员预先配置的电子签名。")
     @PostMapping("/batch-approve")
     public ApiResponse<BatchApproveLeaveResponse> batchApprove(@Valid @ModelAttribute BatchApproveLeaveDto request) {
         return ApiResponse.success("批量审批完成", leaveService.batchApprove(request));
@@ -62,7 +78,7 @@ public class LeaveController {
         return ApiResponse.success("撤销成功", leaveService.cancelLeave(leaveId, request));
     }
 
-    @Operation(summary = "上传审批电子签名", description = "对当前待审批节点预上传电子签名，返回签名地址供后续审批接口使用。")
+    @Operation(summary = "获取审批电子签名", description = "返回当前账号已由超级管理员预先配置的电子签名地址；未配置则不允许审批。")
     @PostMapping("/{leaveId}/approval-signature")
     public ApiResponse<ApprovalSignatureUploadResponse> uploadApprovalSignature(@PathVariable Long leaveId,
                                                                                 @Valid @ModelAttribute UploadApprovalSignatureDto request) {
@@ -88,6 +104,12 @@ public class LeaveController {
         return ApiResponse.success(leaveService.getLeavePdf(leaveId));
     }
 
+    @Operation(summary = "批量下载请假单 PDF", description = "考勤管理员可按请假时间段，批量生成本单位已审批完成的请假记录单合并 PDF。")
+    @PostMapping("/pdf/batch")
+    public ApiResponse<BatchLeavePdfResponse> batchDownloadPdf(@Valid @RequestBody BatchLeavePdfRequest request) {
+        return ApiResponse.success(leaveService.batchDownloadPdf(request));
+    }
+
     @Operation(summary = "可选择领导", description = "根据请假规则返回当前请假单在选择领导节点可选的领导列表。")
     @GetMapping("/{leaveId}/selected-approvers")
     public ApiResponse<List<SelectedApproverResponse>> getSelectedApprovers(@PathVariable Long leaveId) {
@@ -101,6 +123,16 @@ public class LeaveController {
                                                                  @RequestParam(required = false, defaultValue = "1") Integer pageNum,
                                                                  @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
         return ApiResponse.success(leaveService.listLeaves(status, leaveTypeId, pageNum, pageSize));
+    }
+
+    @Operation(summary = "近三个月请假单列表", description = "根据当前登录人的数据权限返回近三个月请假单列表，仅包含请假开始时间属于本月、上个月、上上个月的数据。")
+    @GetMapping("/approval-list/recent-three-months")
+    public ApiResponse<PageResponse<LeaveListItemResponse>> listRecentThreeMonthApprovalLeaves(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long leaveTypeId,
+            @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return ApiResponse.success(leaveService.listRecentThreeMonthApprovalLeaves(status, leaveTypeId, pageNum, pageSize));
     }
 
     @Operation(summary = "请假类型列表", description = "返回所有请假类型，供前端下拉选择。")

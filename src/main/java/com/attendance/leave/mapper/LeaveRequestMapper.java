@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
@@ -63,6 +64,8 @@ public interface LeaveRequestMapper {
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
             "  <if test='applicantId != null'> AND applicant_id = #{applicantId}</if>",
+            "  AND start_time &gt;= #{monthStart}",
+            "  AND start_time &lt; #{monthEnd}",
             "  <if test='status != null and status != \"\"'> AND status = #{status}</if>",
             "  <if test='leaveTypeId != null'> AND leave_type_id = #{leaveTypeId}</if>",
             "</where>",
@@ -73,6 +76,8 @@ public interface LeaveRequestMapper {
                                        @Param("applicantId") Long applicantId,
                                        @Param("status") String status,
                                        @Param("leaveTypeId") Long leaveTypeId,
+                                       @Param("monthStart") java.time.LocalDateTime monthStart,
+                                       @Param("monthEnd") java.time.LocalDateTime monthEnd,
                                        @Param("offset") Integer offset,
                                        @Param("pageSize") Integer pageSize);
 
@@ -82,6 +87,8 @@ public interface LeaveRequestMapper {
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
             "  <if test='applicantId != null'> AND applicant_id = #{applicantId}</if>",
+            "  AND start_time &gt;= #{monthStart}",
+            "  AND start_time &lt; #{monthEnd}",
             "  <if test='status != null and status != \"\"'> AND status = #{status}</if>",
             "  <if test='leaveTypeId != null'> AND leave_type_id = #{leaveTypeId}</if>",
             "</where>",
@@ -89,7 +96,9 @@ public interface LeaveRequestMapper {
     Long countByScope(@Param("orgUnitId") Long orgUnitId,
                       @Param("applicantId") Long applicantId,
                       @Param("status") String status,
-                      @Param("leaveTypeId") Long leaveTypeId);
+                      @Param("leaveTypeId") Long leaveTypeId,
+                      @Param("monthStart") java.time.LocalDateTime monthStart,
+                      @Param("monthEnd") java.time.LocalDateTime monthEnd);
 
     @Select({"<script>",
             "SELECT COUNT(DISTINCT lr.id)",
@@ -153,6 +162,8 @@ public interface LeaveRequestMapper {
             "    AND (la.approval_status IN ('APPROVED', 'REJECTED', 'SKIPPED', 'CANCELLED')",
             "         OR (la.approval_status = 'PENDING' AND lr.current_step = la.step_no))",
             ")",
+            "  AND lr.start_time &gt;= #{monthStart}",
+            "  AND lr.start_time &lt; #{monthEnd}",
             "  <if test='status != null and status != \"\"'> AND lr.status = #{status}</if>",
             "  <if test='leaveTypeId != null'> AND lr.leave_type_id = #{leaveTypeId}</if>",
             "</script>"})
@@ -160,7 +171,9 @@ public interface LeaveRequestMapper {
                                     @Param("roleCode") String roleCode,
                                     @Param("orgUnitId") Long orgUnitId,
                                     @Param("status") String status,
-                                    @Param("leaveTypeId") Long leaveTypeId);
+                                    @Param("leaveTypeId") Long leaveTypeId,
+                                    @Param("monthStart") java.time.LocalDateTime monthStart,
+                                    @Param("monthEnd") java.time.LocalDateTime monthEnd);
 
     @Select({"<script>",
             "SELECT DISTINCT lr.id, lr.request_no, lr.applicant_id, lr.org_unit_id, lr.leave_type_id, lr.approval_rule_id, lr.applicant_type,",
@@ -180,6 +193,8 @@ public interface LeaveRequestMapper {
             "    AND (la.approval_status IN ('APPROVED', 'REJECTED', 'SKIPPED', 'CANCELLED')",
             "         OR (la.approval_status = 'PENDING' AND lr.current_step = la.step_no))",
             ")",
+            "  AND lr.start_time &gt;= #{monthStart}",
+            "  AND lr.start_time &lt; #{monthEnd}",
             "  <if test='status != null and status != \"\"'> AND lr.status = #{status}</if>",
             "  <if test='leaveTypeId != null'> AND lr.leave_type_id = #{leaveTypeId}</if>",
             "ORDER BY lr.id DESC",
@@ -190,6 +205,8 @@ public interface LeaveRequestMapper {
                                                      @Param("orgUnitId") Long orgUnitId,
                                                      @Param("status") String status,
                                                      @Param("leaveTypeId") Long leaveTypeId,
+                                                     @Param("monthStart") java.time.LocalDateTime monthStart,
+                                                     @Param("monthEnd") java.time.LocalDateTime monthEnd,
                                                      @Param("offset") Integer offset,
                                                      @Param("pageSize") Integer pageSize);
 
@@ -198,21 +215,25 @@ public interface LeaveRequestMapper {
             "FROM leave_request lr",
             "JOIN leave_type lt ON lt.id = lr.leave_type_id",
             "<where>",
-            "  <if test='orgUnitId != null'> lr.org_unit_id = #{orgUnitId}</if>",
+            "  lr.start_time &gt;= #{monthStart}",
+            "  AND lr.start_time &lt; #{monthEnd}",
+            "  <if test='orgUnitId != null'> AND lr.org_unit_id = #{orgUnitId}</if>",
             "  <if test='applicantId != null'> AND lr.applicant_id = #{applicantId}</if>",
             "</where>",
             "GROUP BY lr.leave_type_id, lt.leave_name",
             "ORDER BY lr.leave_type_id ASC",
             "</script>"})
-    List<DashboardLeaveTypeCountResponse> countRequestsByLeaveType(@Param("orgUnitId") Long orgUnitId,
-                                                                   @Param("applicantId") Long applicantId);
+    List<DashboardLeaveTypeCountResponse> countMonthlyRequestsByLeaveType(@Param("monthStart") java.time.LocalDateTime monthStart,
+                                                                          @Param("monthEnd") java.time.LocalDateTime monthEnd,
+                                                                          @Param("orgUnitId") Long orgUnitId,
+                                                                          @Param("applicantId") Long applicantId);
 
     @Select({"<script>",
             "SELECT COUNT(1)",
             "FROM leave_request",
             "<where>",
-            "  submitted_at &gt;= #{monthStart}",
-            "  AND submitted_at &lt; #{monthEnd}",
+            "  start_time &gt;= #{monthStart}",
+            "  AND start_time &lt; #{monthEnd}",
             "  AND status IN",
             "  <foreach collection='statuses' item='status' open='(' separator=',' close=')'>",
             "    #{status}",
@@ -230,7 +251,7 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT COUNT(1)",
             "FROM leave_request",
-            "WHERE applicant_id = #{applicantId}",
+            "WHERE applicant_name_snapshot = #{applicantNameSnapshot}",
             "  AND leave_type_id = #{leaveTypeId}",
             "  AND status IN",
             "  <foreach collection='statuses' item='status' open='(' separator=',' close=')'>",
@@ -241,7 +262,7 @@ public interface LeaveRequestMapper {
             "  <if test='minDays != null'> AND leave_days &gt;= #{minDays}</if>",
             "  <if test='maxDays != null'> AND leave_days &lt;= #{maxDays}</if>",
             "</script>"})
-    Long countLeaveRequestsByApplicantAndRange(@Param("applicantId") Long applicantId,
+    Long countLeaveRequestsByApplicantAndRange(@Param("applicantNameSnapshot") String applicantNameSnapshot,
                                                @Param("leaveTypeId") Long leaveTypeId,
                                                @Param("statuses") List<String> statuses,
                                                @Param("periodStart") java.time.LocalDate periodStart,
@@ -255,7 +276,7 @@ public interface LeaveRequestMapper {
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
             "       final_approved_at, created_by, created_at, updated_at",
             "FROM leave_request",
-            "WHERE applicant_id = #{applicantId}",
+            "WHERE applicant_name_snapshot = #{applicantNameSnapshot}",
             "  AND leave_type_id = #{leaveTypeId}",
             "  AND status IN",
             "  <foreach collection='statuses' item='status' open='(' separator=',' close=')'>",
@@ -266,7 +287,7 @@ public interface LeaveRequestMapper {
             "ORDER BY start_date DESC, id DESC",
             "LIMIT 1",
             "</script>"})
-    LeaveRequest findFirstOverlappingOrAdjacent(@Param("applicantId") Long applicantId,
+    LeaveRequest findFirstOverlappingOrAdjacent(@Param("applicantNameSnapshot") String applicantNameSnapshot,
                                                 @Param("leaveTypeId") Long leaveTypeId,
                                                 @Param("statuses") List<String> statuses,
                                                 @Param("startDate") java.time.LocalDate startDate,
@@ -282,4 +303,58 @@ public interface LeaveRequestMapper {
             WHERE id = #{id}
             """)
     int updateApprovalState(LeaveRequest request);
+
+    @Update("""
+            UPDATE leave_request
+            SET request_no = #{requestNo},
+                applicant_id = #{applicantId},
+                org_unit_id = #{orgUnitId},
+                leave_type_id = #{leaveTypeId},
+                approval_rule_id = #{approvalRuleId},
+                applicant_name_snapshot = #{applicantNameSnapshot},
+                applicant_type = #{applicantType},
+                position_level_code = #{positionLevelCode},
+                job_title_snapshot = #{jobTitleSnapshot},
+                team_leader_snapshot = #{teamLeaderSnapshot},
+                start_date = #{startDate},
+                end_date = #{endDate},
+                start_time = #{startTime},
+                end_time = #{endTime},
+                leave_days = #{leaveDays},
+                allowed_days = #{allowedDays},
+                exceeds_one_month = #{exceedsOneMonth},
+                reason = #{reason},
+                remark = #{remark},
+                status = #{status},
+                current_step = #{currentStep},
+                current_action_type = #{currentActionType},
+                submitted_at = #{submittedAt},
+                final_approved_at = #{finalApprovedAt},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateEditableRejected(LeaveRequest request);
+
+    @Delete("""
+            DELETE FROM leave_request
+            WHERE id = #{id}
+            """)
+    int deleteById(@Param("id") Long id);
+
+    @Select({"<script>",
+            "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
+            "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
+            "       final_approved_at, created_by, created_at, updated_at",
+            "FROM leave_request",
+            "WHERE org_unit_id = #{orgUnitId}",
+            "  AND status = 'APPROVED'",
+            "  AND final_approved_at IS NOT NULL",
+            "  AND start_date &lt;= #{endDate}",
+            "  AND end_date &gt;= #{startDate}",
+            "ORDER BY start_time ASC, id ASC",
+            "</script>"})
+    List<LeaveRequest> findApprovedByDateRange(@Param("orgUnitId") Long orgUnitId,
+                                               @Param("startDate") java.time.LocalDate startDate,
+                                               @Param("endDate") java.time.LocalDate endDate);
 }

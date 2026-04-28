@@ -30,4 +30,6 @@ public class CreateUserRequest {
     private String dataScope = "SELF";
 
     private String approvalScope = "NONE";
+
+    private String signatureUrl;
 }

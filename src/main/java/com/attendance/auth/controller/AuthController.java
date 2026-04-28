@@ -3,9 +3,12 @@ package com.attendance.auth.controller;
 import com.attendance.auth.dto.DashboardResponse;
 import com.attendance.auth.dto.LoginRequest;
 import com.attendance.auth.dto.LoginResponse;
+import com.attendance.auth.dto.DashboardApprovalStatsResponse;
+import com.attendance.auth.dto.DashboardLeaveTypeCountResponse;
 import com.attendance.auth.dto.UserMessageResponse;
 import com.attendance.auth.service.AuthService;
 import com.attendance.common.ApiResponse;
+import com.attendance.common.PageResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,6 +37,26 @@ public class AuthController {
     @GetMapping("/dashboard")
     public ApiResponse<DashboardResponse> dashboard() {
         return ApiResponse.success(authService.getDashboard());
+    }
+
+    @Operation(summary = "账号工作台-请假类别统计", description = "返回当前账号按数据权限统计的当月请假类别及数量，按请假开始时间所属月份过滤。")
+    @GetMapping("/dashboard/leave-type-request-counts")
+    public ApiResponse<List<DashboardLeaveTypeCountResponse>> dashboardLeaveTypeRequestCounts() {
+        return ApiResponse.success(authService.getDashboardLeaveTypeRequestCounts());
+    }
+
+    @Operation(summary = "账号工作台-待审批已审批统计", description = "返回当前账号当月待审批、已审批数量，按请假开始时间所属月份过滤。")
+    @GetMapping("/dashboard/approval-stats")
+    public ApiResponse<DashboardApprovalStatsResponse> dashboardApprovalStats() {
+        return ApiResponse.success(authService.getDashboardApprovalStats());
+    }
+
+    @Operation(summary = "账号工作台-信息提示", description = "分页返回当前账号最近信息提示，固定每页 5 条。")
+    @GetMapping("/dashboard/messages")
+    public ApiResponse<PageResponse<UserMessageResponse>> dashboardMessages(
+            @RequestParam(defaultValue = "1") Integer pageNum,
+            @RequestParam(defaultValue = "5") Integer pageSize) {
+        return ApiResponse.success(authService.listMyMessages(pageNum, pageSize));
     }
 
 }

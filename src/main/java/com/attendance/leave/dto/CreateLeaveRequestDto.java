@@ -17,10 +17,10 @@ public class CreateLeaveRequestDto {
     private String applicantName;
 
     @NotBlank(message = "职名不能为空")
-    private String jobTitle;
+    private String jobTitleSnapshot;
 
     @NotBlank(message = "班组长信息不能为空")
-    private String teamLeaderInfo;
+    private String teamLeaderSnapshot;
 
     @NotBlank(message = "人员类别不能为空")
     private String applicantType;

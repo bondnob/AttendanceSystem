@@ -1,6 +1,7 @@
 com\attendance\admin\dto\OrgUnitResponse.class
 com\attendance\leave\dto\SelectedApproverResponse.class
 com\attendance\admin\dto\SaveApprovalPermissionRequest.class
+com\attendance\admin\dto\UpdateUserSignatureRequest.class
 com\attendance\auth\mapper\UserMessageMapper.class
 com\attendance\admin\dto\UpdateOrgUnitRequest.class
 com\attendance\auth\controller\AuthController.class
@@ -24,6 +25,7 @@ com\attendance\admin\model\ApprovalPermission.class
 com\attendance\leave\model\LeaveRequest.class
 com\attendance\leave\dto\BatchApproveLeaveResponse$BatchApproveLeaveResponseBuilder.class
 com\attendance\admin\dto\UserSummaryResponse$UserSummaryResponseBuilder.class
+com\attendance\leave\dto\BatchLeavePdfResponse$BatchLeavePdfResponseBuilder.class
 com\attendance\auth\dto\LoginResponse.class
 com\attendance\leave\dto\LeaveStatusOptionResponse$LeaveStatusOptionResponseBuilder.class
 com\attendance\auth\dto\DashboardResponse$DashboardResponseBuilder.class
@@ -57,6 +59,7 @@ com\attendance\leave\service\LeaveDocumentService$ApprovalSlot.class
 com\attendance\leave\dto\LeaveDetailResponse.class
 com\attendance\leave\dto\SignLeaveRequestDto.class
 com\attendance\leave\dto\LeaveDetailResponse$LeaveDetailResponseBuilder.class
+com\attendance\leave\dto\BatchLeavePdfResponse.class
 com\attendance\admin\mapper\ApprovalPermissionMapper.class
 com\attendance\common\PasswordUtils.class
 com\attendance\leave\dto\UploadApprovalSignatureDto.class
@@ -88,6 +91,7 @@ com\attendance\leave\dto\ApproveLeaveWithSignatureDto.class
 com\attendance\auth\dto\UserMessageResponse$UserMessageResponseBuilder.class
 com\attendance\auth\dto\LoginRequest.class
 com\attendance\leave\dto\LeaveListItemResponse$LeaveListItemResponseBuilder.class
+com\attendance\leave\dto\BatchLeavePdfRequest.class
 com\attendance\auth\dto\DashboardApprovalStatsResponse$DashboardApprovalStatsResponseBuilder.class
 com\attendance\leave\service\LeaveService$SelectionScenario.class
 com\attendance\leave\dto\LeavePdfResponse.class

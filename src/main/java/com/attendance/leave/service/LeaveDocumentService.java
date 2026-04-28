@@ -11,10 +11,13 @@ import com.lowagie.text.Image;
 import com.lowagie.text.pdf.BaseFont;
 import com.lowagie.text.pdf.ColumnText;
 import com.lowagie.text.pdf.PdfContentByte;
+import com.lowagie.text.pdf.PdfCopy;
 import com.lowagie.text.pdf.PdfGState;
 import com.lowagie.text.pdf.PdfImportedPage;
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.PdfWriter;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.URI;
@@ -29,6 +32,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
+import javax.imageio.ImageIO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,6 +45,8 @@ import org.springframework.stereotype.Service;
 public class LeaveDocumentService {
 
     private static final String APPLICANT_TYPE_EMPLOYEE = "EMPLOYEE";
+    private static final String APPLICANT_TYPE_GENERAL_CADRE = "GENERAL_CADRE";
+    private static final String HR_ORG_CODE = "D04";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String EMPLOYEE_TEMPLATE = "docs/职工请假记录单.pdf";
@@ -82,6 +89,34 @@ public class LeaveDocumentService {
             return "/files/leave-pdfs/" + target.getFileName();
         } catch (IOException | DocumentException ex) {
             throw new BizException("请假单 PDF 生成失败");
+        }
+    }
+
+    public String generateMergedPdf(List<Path> pdfPaths) {
+        if (pdfPaths == null || pdfPaths.isEmpty()) {
+            throw new BizException("未找到可下载的请假记录单");
+        }
+        try {
+            Path directory = Paths.get(fileStoragePath, "leave-pdfs");
+            Files.createDirectories(directory);
+            Path target = directory.resolve("leave_batch_" + LocalDateTime.now().format(FILE_TIME_FORMATTER)
+                    + "_" + UUID.randomUUID().toString().replace("-", "") + ".pdf");
+            try (OutputStream outputStream = Files.newOutputStream(target)) {
+                Document document = new Document();
+                PdfCopy copy = new PdfCopy(document, outputStream);
+                document.open();
+                for (Path pdfPath : pdfPaths) {
+                    try (PdfReader reader = new PdfReader(pdfPath.toString())) {
+                        for (int page = 1; page <= reader.getNumberOfPages(); page++) {
+                            copy.addPage(copy.getImportedPage(reader, page));
+                        }
+                    }
+                }
+                document.close();
+            }
+            return "/files/leave-pdfs/" + target.getFileName();
+        } catch (IOException | DocumentException ex) {
+            throw new BizException("批量请假单 PDF 生成失败");
         }
     }
 
@@ -154,7 +189,7 @@ public class LeaveDocumentService {
         if (slot.approval() == null) {
             return;
         }
-        Image signature = loadSignatureImage(slot.approval().getSignatureUrl());
+        Image signature = slot.showSignature() ? loadSignatureImage(slot.approval().getSignatureUrl()) : null;
         if (signature != null) {
             signature.scaleAbsolute(SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
             float signatureX = slot.left() + SIGNATURE_X_OFFSET;
@@ -296,11 +331,48 @@ public class LeaveDocumentService {
                 log.warn("signature image not found: {}", newSignatureUrl);
                 return null;
             }
-            return Image.getInstance(path.toAbsolutePath().toString());
+            return loadAndTrimSignatureImage(path);
         } catch (Exception ex) {
             log.warn("load signature image failed: {}", newSignatureUrl, ex);
             return null;
         }
+    }
+
+    private Image loadAndTrimSignatureImage(Path path) throws IOException, DocumentException {
+        BufferedImage source = ImageIO.read(path.toFile());
+        if (source == null) {
+            return Image.getInstance(path.toAbsolutePath().toString());
+        }
+        BufferedImage trimmed = trimTransparentBorder(source);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(trimmed, "png", output);
+        return Image.getInstance(output.toByteArray());
+    }
+
+    private BufferedImage trimTransparentBorder(BufferedImage source) {
+        if (!source.getColorModel().hasAlpha()) {
+            return source;
+        }
+        int minX = source.getWidth();
+        int minY = source.getHeight();
+        int maxX = -1;
+        int maxY = -1;
+        for (int y = 0; y < source.getHeight(); y++) {
+            for (int x = 0; x < source.getWidth(); x++) {
+                int alpha = (source.getRGB(x, y) >>> 24) & 0xff;
+                if (alpha == 0) {
+                    continue;
+                }
+                minX = Math.min(minX, x);
+                minY = Math.min(minY, y);
+                maxX = Math.max(maxX, x);
+                maxY = Math.max(maxY, y);
+            }
+        }
+        if (maxX < minX || maxY < minY) {
+            return source;
+        }
+        return source.getSubimage(minX, minY, maxX - minX + 1, maxY - minY + 1);
     }
 
     private String normalizeSignatureUrl(String signatureUrl) {
@@ -311,7 +383,11 @@ public class LeaveDocumentService {
     }
 
     private Path resolveSignaturePath(String signatureUrl) {
-        String normalized = extractPath(signatureUrl);
+        return resolveStoredFilePath(signatureUrl);
+    }
+
+    public Path resolveStoredFilePath(String fileUrl) {
+        String normalized = extractPath(fileUrl);
         if (normalized.startsWith("/files/")) {
             normalized = normalized.substring("/files/".length());
         } else if (normalized.startsWith("files/")) {
@@ -414,33 +490,69 @@ public class LeaveDocumentService {
         List<ApprovalRecordResponse> approvals = detail.getApprovals() == null ? List.of() : detail.getApprovals();
         List<ApprovalSlot> slots = new ArrayList<>();
         if (usesEmployeePdfLayout(detail)) {
-            ApprovalRecordResponse unitLeader = findApprovalByRole(approvals, "UNIT_LEADER");
+            ApprovalRecordResponse deputyStationmaster = findApprovalByRole(approvals, "DEPUTY_STATIONMASTER");
             ApprovalRecordResponse orgPrincipal = findApprovalByRole(approvals, "ORG_PRINCIPAL");
             if (isPersonalLeaveOver30Days(detail)) {
-                slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505));
-                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505));
+                slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505, true));
             } else {
-                slots.add(new ApprovalSlot(67, 541, 295, 463, safe(detail.getTeamLeaderSnapshot()), detail.getSubmittedAt(), null, 176, 220, 244, 467, 0));
-                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505));
+                slots.add(new ApprovalSlot(67, 541, 295, 463, safe(detail.getTeamLeaderSnapshot()), detail.getSubmittedAt(), null, 176, 220, 244, 467, 0, false));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true));
             }
-            if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && unitLeader != null) {
-                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, unitLeader, 176, 220, 244, 388, 426));
-                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426));
+            if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426, true));
             } else {
-                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426));
-                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findLastLeaderApproval(approvals), 410, 454, 478, 388, 426));
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findLastLeaderApproval(approvals), 410, 454, 478, 388, 426, true));
             }
             return slots;
         }
-        ApprovalRecordResponse orgPrincipal = findApprovalByRole(approvals, "ORG_PRINCIPAL");
-        ApprovalRecordResponse second = approvals.size() > 1 ? approvals.get(1) : null;
+        ApprovalRecordResponse hrSectionChiefApproval = findApprovalByRole(approvals, "HR_SECTION_CHIEF");
+        ApprovalRecordResponse orgPrincipal = resolveCadreTopLeftApproval(detail, approvals, hrSectionChiefApproval);
+        ApprovalRecordResponse hrSectionChief = isGeneralCadre(detail)
+                ? null
+                : hrSectionChiefApproval;
         ApprovalRecordResponse stationmaster = findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长");
-        ApprovalRecordResponse partySecretary = findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
-        slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505));
-        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, second, 410, 454, 478, 467, 505));
-        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmaster, 176, 220, 244, 388, 426));
-        slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, partySecretary, 410, 454, 478, 388, 426));
+        ApprovalRecordResponse partySecretary = isGeneralCadre(detail)
+                ? null
+                : findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
+        slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true));
+        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, hrSectionChief, 410, 454, 478, 467, 505, true));
+        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmaster, 176, 220, 244, 388, 426, true));
+        slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, partySecretary, 410, 454, 478, 388, 426, true));
         return slots;
+    }
+
+    private boolean isGeneralCadre(LeaveDetailResponse detail) {
+        return APPLICANT_TYPE_GENERAL_CADRE.equals(detail.getApplicantType())
+                || APPLICANT_TYPE_GENERAL_CADRE.equals(detail.getPositionLevelCode());
+    }
+
+    private ApprovalRecordResponse resolveCadreTopLeftApproval(LeaveDetailResponse detail,
+                                                               List<ApprovalRecordResponse> approvals,
+                                                               ApprovalRecordResponse hrSectionChiefApproval) {
+        if (isHrGeneralCadreLeave(detail) && hrSectionChiefApproval != null) {
+            return hrSectionChiefApproval;
+        }
+        return findApprovalByRole(approvals, "ORG_PRINCIPAL");
+    }
+
+    private boolean isHrGeneralCadreLeave(LeaveDetailResponse detail) {
+        return isGeneralCadre(detail) && isHrOrgUnit(detail.getOrgUnitId());
+    }
+
+    private boolean isHrOrgUnit(Long orgUnitId) {
+        if (orgUnitId == null) {
+            return false;
+        }
+        OrgUnit orgUnit = orgUnitMapper.findById(orgUnitId);
+        if (orgUnit == null) {
+            return false;
+        }
+        String orgCode = safe(orgUnit.getOrgCode()).trim();
+        String orgName = safe(orgUnit.getOrgName()).trim();
+        return HR_ORG_CODE.equalsIgnoreCase(orgCode) || orgName.contains("劳动人事科");
     }
 
     private ApprovalRecordResponse findApprovalByRole(List<ApprovalRecordResponse> approvals, String roleCode) {
@@ -520,7 +632,7 @@ public class LeaveDocumentService {
     private record ApprovalSlot(float left, float top, float right, float bottom,
                                 String content, LocalDateTime contentDate, ApprovalRecordResponse approval,
                                 float dateYearX, float dateMonthX, float dateDayX, float dateY,
-                                float decisionY) {
+                                float decisionY, boolean showSignature) {
         float width() {
             return right - left - 20;
         }

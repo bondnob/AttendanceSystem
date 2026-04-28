@@ -14,7 +14,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE id = #{id}
             """)
@@ -22,7 +22,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE username = #{username}
             """)
@@ -30,7 +30,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE emp_name = #{empName}
               AND is_enabled = 1
@@ -40,7 +40,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                    applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE org_unit_id = #{orgUnitId} AND role_code = #{roleCode}
             LIMIT 1
@@ -49,7 +49,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE role_code = #{roleCode}
             LIMIT 1
@@ -58,7 +58,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE leader_group_code = #{leaderGroupCode}
               AND is_enabled = 1
@@ -68,7 +68,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             ORDER BY id DESC
             """)
@@ -88,7 +88,7 @@ public interface UserAccountMapper {
     @Select("""
             <script>
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             <if test="empName != null and empName != ''">
                 WHERE emp_name LIKE CONCAT('%', #{empName}, '%')
@@ -103,7 +103,7 @@ public interface UserAccountMapper {
 
     @Select("""
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
-                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
             WHERE id = #{userId}
               AND is_enabled = 1
@@ -113,10 +113,10 @@ public interface UserAccountMapper {
     @Insert("""
             INSERT INTO user_account
             (username, password_hash, role_code, emp_name,  applicant_type,
-             leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled)
+             leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url)
             VALUES
             (#{username}, #{passwordHash}, #{roleCode}, #{empName}, #{applicantType}, 
-             #{leaderGroupCode}, #{orgUnitId}, #{dataScope}, #{approvalScope}, #{isEnabled})
+             #{leaderGroupCode}, #{orgUnitId}, #{dataScope}, #{approvalScope}, #{isEnabled}, #{signatureUrl})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(UserAccount userAccount);
@@ -131,17 +131,27 @@ public interface UserAccountMapper {
 
     @Update("""
             UPDATE user_account
-            SET role_code = #{roleCode},
+            SET username = #{username},
+                role_code = #{roleCode},
                 emp_name = #{empName},
                 applicant_type = #{applicantType},
                 leader_group_code = #{leaderGroupCode},
                 org_unit_id = #{orgUnitId},
                 data_scope = #{dataScope},
                 approval_scope = #{approvalScope},
+                signature_url = #{signatureUrl},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
             """)
     int update(UserAccount userAccount);
+
+    @Update("""
+            UPDATE user_account
+            SET signature_url = #{signatureUrl},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateSignatureUrl(@Param("id") Long id, @Param("signatureUrl") String signatureUrl);
 
     @Update("""
             UPDATE user_account

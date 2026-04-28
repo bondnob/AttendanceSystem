@@ -11,6 +11,7 @@ import com.attendance.auth.model.UserMessage;
 import com.attendance.auth.security.CurrentUser;
 import com.attendance.auth.security.JwtTokenProvider;
 import com.attendance.auth.security.UserContext;
+import com.attendance.common.PageResponse;
 import com.attendance.common.PasswordUtils;
 import com.attendance.exception.BizException;
 import com.attendance.leave.enums.LeaveRequestStatus;
@@ -57,6 +58,7 @@ public class AuthService {
                 .orgUnitId(user.getOrgUnitId())
                 .dataScope(user.getDataScope())
                 .approvalScope(user.getApprovalScope())
+                .signatureUrl(user.getSignatureUrl())
                 .token(token)
                 .tokenType("Bearer")
                 .expiresInSeconds(jwtTokenProvider.getExpireSeconds())
@@ -64,61 +66,106 @@ public class AuthService {
     }
 
     public DashboardResponse getDashboard() {
-        UserAccount currentUser = requireCurrentUser();
-        Long orgUnitId = null;
-        Long applicantId = null;
-        if ("ORG".equals(currentUser.getDataScope())) {
-            orgUnitId = currentUser.getOrgUnitId();
-        } else if (!"ALL".equals(currentUser.getDataScope())) {
-            applicantId = currentUser.getId();
-        }
-
-        List<DashboardLeaveTypeCountResponse> leaveTypeRequestCounts =
-                leaveRequestMapper.countRequestsByLeaveType(orgUnitId, applicantId);
-        DashboardApprovalStatsResponse approvalStats = buildDashboardApprovalStats(currentUser, orgUnitId, applicantId);
-
         return DashboardResponse.builder()
-                .leaveTypeRequestCounts(leaveTypeRequestCounts)
-                .monthlyApprovalStats(approvalStats)
-                .messages(listMyMessages())
+                .leaveTypeRequestCounts(getDashboardLeaveTypeRequestCounts())
+                .monthlyApprovalStats(getDashboardApprovalStats())
+                .messages(listMyMessages(1, 5).getRecords())
                 .build();
     }
 
-    private DashboardApprovalStatsResponse buildDashboardApprovalStats(UserAccount currentUser, Long orgUnitId, Long applicantId) {
+    public List<DashboardLeaveTypeCountResponse> getDashboardLeaveTypeRequestCounts() {
+        UserAccount currentUser = requireCurrentUser();
+        Long orgUnitId = resolveDashboardOrgUnitId(currentUser);
+        Long applicantId = resolveDashboardApplicantId(currentUser);
+        LocalDateTime monthStart = currentMonthStart();
+        LocalDateTime monthEnd = nextMonthStart(monthStart);
+        return leaveRequestMapper.countMonthlyRequestsByLeaveType(monthStart, monthEnd, orgUnitId, applicantId);
+    }
+
+    public DashboardApprovalStatsResponse getDashboardApprovalStats() {
+        UserAccount currentUser = requireCurrentUser();
+        Long orgUnitId = resolveDashboardOrgUnitId(currentUser);
+        Long applicantId = resolveDashboardApplicantId(currentUser);
+        LocalDateTime monthStart = currentMonthStart();
+        LocalDateTime monthEnd = nextMonthStart(monthStart);
+        return buildDashboardApprovalStats(currentUser, orgUnitId, applicantId, monthStart, monthEnd);
+    }
+
+    private DashboardApprovalStatsResponse buildDashboardApprovalStats(UserAccount currentUser,
+                                                                       Long orgUnitId,
+                                                                       Long applicantId,
+                                                                       LocalDateTime monthStart,
+                                                                       LocalDateTime monthEnd) {
         if (RoleCode.ATTENDANCE_ADMIN.equals(currentUser.getRoleCode())
                 || RoleCode.ORG_PRINCIPAL.equals(currentUser.getRoleCode())) {
-            Long pendingCount = leaveRequestMapper.countByScope(orgUnitId, applicantId, LeaveRequestStatus.PENDING, null);
-            Long approvedCount = leaveRequestMapper.countByScope(
-                    orgUnitId, applicantId, null, null);
-            approvedCount = countApprovedOrRejectedByScope(orgUnitId, applicantId);
+            Long pendingCount = leaveRequestMapper.countMonthlyRequestsByStatus(
+                    monthStart, monthEnd, List.of(LeaveRequestStatus.PENDING), orgUnitId, applicantId);
+            Long approvedCount = countApprovedOrRejectedByScope(monthStart, monthEnd, orgUnitId, applicantId);
             return DashboardApprovalStatsResponse.builder()
                     .pendingCount(pendingCount == null ? 0L : pendingCount)
                     .approvedCount(approvedCount == null ? 0L : approvedCount)
                     .build();
         }
 
-        Long pendingCount = leaveApprovalMapper.countPendingForUser(
-                currentUser.getId(), currentUser.getRoleCode(), currentUser.getOrgUnitId());
-        Long approvedCount = leaveApprovalMapper.countProcessedByUser(currentUser.getId());
+        Long pendingCount = leaveApprovalMapper.countMonthlyPendingForUser(
+                currentUser.getId(), currentUser.getRoleCode(), currentUser.getOrgUnitId(), monthStart, monthEnd);
+        Long approvedCount = leaveApprovalMapper.countMonthlyProcessedByUser(currentUser.getId(), monthStart, monthEnd);
         return DashboardApprovalStatsResponse.builder()
                 .pendingCount(pendingCount == null ? 0L : pendingCount)
                 .approvedCount(approvedCount == null ? 0L : approvedCount)
                 .build();
     }
 
-    private Long countApprovedOrRejectedByScope(Long orgUnitId, Long applicantId) {
-        Long approvedCount = leaveRequestMapper.countByScope(orgUnitId, applicantId, LeaveRequestStatus.APPROVED, null);
-        Long rejectedCount = leaveRequestMapper.countByScope(orgUnitId, applicantId, LeaveRequestStatus.REJECTED, null);
+    private Long countApprovedOrRejectedByScope(LocalDateTime monthStart,
+                                                LocalDateTime monthEnd,
+                                                Long orgUnitId,
+                                                Long applicantId) {
+        Long approvedCount = leaveRequestMapper.countMonthlyRequestsByStatus(
+                monthStart, monthEnd, List.of(LeaveRequestStatus.APPROVED), orgUnitId, applicantId);
+        Long rejectedCount = leaveRequestMapper.countMonthlyRequestsByStatus(
+                monthStart, monthEnd, List.of(LeaveRequestStatus.REJECTED), orgUnitId, applicantId);
         long approved = approvedCount == null ? 0L : approvedCount;
         long rejected = rejectedCount == null ? 0L : rejectedCount;
         return approved + rejected;
     }
 
-    public List<UserMessageResponse> listMyMessages() {
+    public PageResponse<UserMessageResponse> listMyMessages(Integer pageNum, Integer pageSize) {
         UserAccount currentUser = requireCurrentUser();
-        return userMessageMapper.findRecentByTargetUserId(currentUser.getId(), 20).stream()
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = 5;
+        int offset = (safePageNum - 1) * safePageSize;
+        Long total = userMessageMapper.countByTargetUserId(currentUser.getId());
+        List<UserMessageResponse> records = userMessageMapper.findPageByTargetUserId(currentUser.getId(), offset, safePageSize).stream()
                 .map(this::toUserMessageResponse)
                 .toList();
+        return PageResponse.<UserMessageResponse>builder()
+                .total(total == null ? 0L : total)
+                .pageNum(safePageNum)
+                .pageSize(safePageSize)
+                .records(records)
+                .build();
+    }
+
+    private Long resolveDashboardOrgUnitId(UserAccount currentUser) {
+        if ("ORG".equals(currentUser.getDataScope())) {
+            return currentUser.getOrgUnitId();
+        }
+        return null;
+    }
+
+    private Long resolveDashboardApplicantId(UserAccount currentUser) {
+        if (!"ORG".equals(currentUser.getDataScope()) && !"ALL".equals(currentUser.getDataScope())) {
+            return currentUser.getId();
+        }
+        return null;
+    }
+
+    private LocalDateTime currentMonthStart() {
+        return LocalDate.now().withDayOfMonth(1).atStartOfDay();
+    }
+
+    private LocalDateTime nextMonthStart(LocalDateTime monthStart) {
+        return monthStart.plusMonths(1);
     }
 
     private UserMessageResponse toUserMessageResponse(UserMessage message) {

@@ -20,4 +20,5 @@ public class UserSummaryResponse {
     private String dataScope;
     private String approvalScope;
     private Integer isEnabled;
+    private String signatureUrl;
 }

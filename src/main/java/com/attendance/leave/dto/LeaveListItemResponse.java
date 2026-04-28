@@ -2,6 +2,7 @@ package com.attendance.leave.dto;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.Builder;
 import lombok.Data;
 
@@ -27,4 +28,6 @@ public class LeaveListItemResponse {
     private String reason;
     private String remark;
     private LocalDateTime submittedAt;
+    private String jobTitleSnapshot;
+    private List<String> approvedRoles;
 }

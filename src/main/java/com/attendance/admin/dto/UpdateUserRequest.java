@@ -6,6 +6,9 @@ import lombok.Data;
 
 @Data
 public class UpdateUserRequest {
+    @NotBlank(message = "账号不能为空")
+    private String username;
+
     @NotBlank(message = "角色编码不能为空")
     private String roleCode;
 
@@ -25,4 +28,6 @@ public class UpdateUserRequest {
     private String approvalScope = "NONE";
 
     private Integer isEnabled = 1;
+
+    private String signatureUrl;
 }

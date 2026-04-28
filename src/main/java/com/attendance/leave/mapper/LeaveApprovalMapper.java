@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 import org.apache.ibatis.annotations.Result;
@@ -31,6 +32,18 @@ public interface LeaveApprovalMapper {
             ORDER BY step_no ASC, id ASC
             """)
     List<LeaveApproval> findByLeaveRequestId(@Param("leaveRequestId") Long leaveRequestId);
+
+    @Select({"<script>",
+            "SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,",
+            "       approval_status, approval_comment, signature_url, approved_at, created_at, updated_at",
+            "FROM leave_approval",
+            "WHERE leave_request_id IN",
+            "  <foreach collection='leaveRequestIds' item='leaveRequestId' open='(' separator=',' close=')'>",
+            "    #{leaveRequestId}",
+            "  </foreach>",
+            "ORDER BY leave_request_id ASC, step_no ASC, id ASC",
+            "</script>"})
+    List<LeaveApproval> findByLeaveRequestIds(@Param("leaveRequestIds") List<Long> leaveRequestIds);
 
     @Select("""
             SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,
@@ -103,9 +116,47 @@ public interface LeaveApprovalMapper {
 
     @Select("""
             SELECT COUNT(1)
+            FROM leave_approval la
+            JOIN leave_request lr ON lr.id = la.leave_request_id
+            WHERE la.approval_status = 'PENDING'
+              AND lr.start_time >= #{monthStart}
+              AND lr.start_time < #{monthEnd}
+              AND (
+                    la.approver_user_id = #{userId}
+                    OR (la.approver_user_id IS NULL AND la.approver_role_code = #{roleCode}
+                        AND (#{roleCode} <> 'ORG_PRINCIPAL' OR lr.org_unit_id = #{orgUnitId}))
+                  )
+            """)
+    Long countMonthlyPendingForUser(@Param("userId") Long userId,
+                                    @Param("roleCode") String roleCode,
+                                    @Param("orgUnitId") Long orgUnitId,
+                                    @Param("monthStart") java.time.LocalDateTime monthStart,
+                                    @Param("monthEnd") java.time.LocalDateTime monthEnd);
+
+    @Select("""
+            SELECT COUNT(1)
             FROM leave_approval
             WHERE approver_user_id = #{userId}
               AND approval_status IN ('APPROVED', 'REJECTED')
             """)
     Long countProcessedByUser(@Param("userId") Long userId);
+
+    @Select("""
+            SELECT COUNT(1)
+            FROM leave_approval la
+            JOIN leave_request lr ON lr.id = la.leave_request_id
+            WHERE la.approver_user_id = #{userId}
+              AND la.approval_status IN ('APPROVED', 'REJECTED')
+              AND lr.start_time >= #{monthStart}
+              AND lr.start_time < #{monthEnd}
+            """)
+    Long countMonthlyProcessedByUser(@Param("userId") Long userId,
+                                     @Param("monthStart") java.time.LocalDateTime monthStart,
+                                     @Param("monthEnd") java.time.LocalDateTime monthEnd);
+
+    @Delete("""
+            DELETE FROM leave_approval
+            WHERE leave_request_id = #{leaveRequestId}
+            """)
+    int deleteByLeaveRequestId(@Param("leaveRequestId") Long leaveRequestId);
 }

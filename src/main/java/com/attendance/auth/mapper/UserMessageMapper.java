@@ -21,11 +21,20 @@ public interface UserMessageMapper {
     int insert(UserMessage message);
 
     @Select("""
+            SELECT COUNT(1)
+            FROM user_message
+            WHERE target_user_id = #{targetUserId}
+            """)
+    Long countByTargetUserId(@Param("targetUserId") Long targetUserId);
+
+    @Select("""
             SELECT id, sender_user_id, target_user_id, title, content, created_at
             FROM user_message
             WHERE target_user_id = #{targetUserId}
             ORDER BY id DESC
-            LIMIT #{limit}
+            LIMIT #{offset}, #{pageSize}
             """)
-    List<UserMessage> findRecentByTargetUserId(@Param("targetUserId") Long targetUserId, @Param("limit") Integer limit);
+    List<UserMessage> findPageByTargetUserId(@Param("targetUserId") Long targetUserId,
+                                             @Param("offset") Integer offset,
+                                             @Param("pageSize") Integer pageSize);
 }

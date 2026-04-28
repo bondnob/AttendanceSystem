@@ -14,6 +14,7 @@ public class LoginResponse {
     private Long orgUnitId;
     private String dataScope;
     private String approvalScope;
+    private String signatureUrl;
     private String token;
     private String tokenType;
     private Long expiresInSeconds;

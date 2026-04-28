@@ -25,6 +25,8 @@ public class FileResourceConfig implements WebMvcConfigurer {
         Path path = Paths.get(fileStoragePath).toAbsolutePath().normalize();
         registry.addResourceHandler("/files/**")
                 .addResourceLocations(path.toUri().toString());
+        registry.addResourceHandler("/api/files/**")
+                .addResourceLocations(path.toUri().toString());
     }
 
     @Override
@@ -33,6 +35,7 @@ public class FileResourceConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/auth/login",
+                        "/api/files/**",
                         "/v3/api-docs/**",
                         "/swagger-ui/**",
                         "/swagger-ui.html");

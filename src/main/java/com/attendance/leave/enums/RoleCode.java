@@ -10,7 +10,6 @@ public final class RoleCode {
     public static final String DEPUTY_STATIONMASTER = "DEPUTY_STATIONMASTER";
     public static final String STATIONMASTER = "STATIONMASTER";
     public static final String PARTY_SECRETARY = "PARTY_SECRETARY";
-    public static final String UNIT_LEADER = "UNIT_LEADER";
     public static final String EMPLOYEE = "EMPLOYEE";
 
     private RoleCode() {

@@ -1,7 +1,9 @@
 package com.attendance.leave.service;
 
 import com.attendance.admin.mapper.ApprovalPermissionMapper;
+import com.attendance.admin.mapper.OrgUnitMapper;
 import com.attendance.admin.model.ApprovalPermission;
+import com.attendance.admin.model.OrgUnit;
 import com.attendance.auth.security.CurrentUser;
 import com.attendance.auth.security.UserContext;
 import com.attendance.common.PageResponse;
@@ -11,6 +13,8 @@ import com.attendance.leave.dto.ApprovalSignatureUploadResponse;
 import com.attendance.leave.dto.ApproveLeaveWithSignatureDto;
 import com.attendance.leave.dto.BatchApproveLeaveDto;
 import com.attendance.leave.dto.BatchApproveLeaveResponse;
+import com.attendance.leave.dto.BatchLeavePdfRequest;
+import com.attendance.leave.dto.BatchLeavePdfResponse;
 import com.attendance.leave.dto.CreateLeaveRequestDto;
 import com.attendance.leave.dto.CancelLeaveRequestDto;
 import com.attendance.leave.dto.LeaveDetailResponse;
@@ -44,6 +48,9 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Month;
 import java.time.format.DateTimeFormatter;
@@ -78,6 +85,7 @@ public class LeaveService {
     private static final String LEAVE_SCOPE_OTHER = "OTHER";
     private static final String LEAVE_SCOPE_SICK = "SICK";
     private static final String LEAVE_SCOPE_PERSONAL = "PERSONAL";
+    private static final Set<String> HR_APPROVAL_EXEMPT_LEAVE_CODES = Set.of("年", "丧", "搬", "病", "事");
     private static final String ACTION_APPROVE = "APPROVE";
     private static final String ACTION_SELECT = "SELECT";
     private static final String APPROVER_SOURCE_APPLICANT_ORG = "APPLICANT_ORG";
@@ -85,7 +93,6 @@ public class LeaveService {
     private static final String APPROVER_SOURCE_SELECTED = "SELECTED";
     private static final String CANDIDATE_GROUP_SUPERVISOR = "SUPERVISOR_LEADER";
     private static final String CANDIDATE_GROUP_STATIONMASTER = "STATIONMASTER";
-    private static final String CANDIDATE_GROUP_UNIT_LEADER = "UNIT_LEADER";
     private static final String CANDIDATE_GROUP_PARTY_AND_PRINCIPAL = "PARTY_AND_PRINCIPAL";
     private static final BigDecimal DAY_1 = BigDecimal.ONE;
     private static final BigDecimal DAY_2 = BigDecimal.valueOf(2);
@@ -108,6 +115,7 @@ public class LeaveService {
     private final ApprovalRuleStepMapper approvalRuleStepMapper;
     private final LeaveSignRequirementService leaveSignRequirementService;
     private final ApprovalPermissionMapper approvalPermissionMapper;
+    private final OrgUnitMapper orgUnitMapper;
     private final LeaveDocumentService leaveDocumentService;
 
     @Value("${attendance.file-storage-path:uploads}")
@@ -122,16 +130,14 @@ public class LeaveService {
         if (!RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())) {
             throw new BizException("只有考勤管理员可以提交请假记录单");
         }
-        if (!operator.getOrgUnitId().equals(applicant.getOrgUnitId())) {
-            throw new BizException("考勤管理员只能提交本部门的请假记录单");
-        }
 
-        String applicantType = normalizeApplicantType(dto.getApplicantType(), applicant.getPositionLevelCode());
+        String applicantType = normalizeApplicantType(dto.getApplicantType());
         BigDecimal allowedDays = leaveType.getDefaultDays() == null ? null : BigDecimal.valueOf(leaveType.getDefaultDays());
         boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(30)) > 0;
-        validateLeaveRequestRules(applicant, leaveType, dto);
         ApprovalRule rule = resolveApprovalRule(applicantType, applicant.getPositionLevelCode(), leaveType, dto.getLeaveDays(), exceedsOneMonth);
-        List<ApprovalRuleStep> steps = requireRuleSteps(rule.getId());
+        String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
+        validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
+        List<ApprovalRuleStep> steps = prepareCreationSteps(rule.getId(), operator, applicantType, leaveType);
 
         LeaveRequest request = new LeaveRequest();
         request.setRequestNo(generateRequestNo());
@@ -139,11 +145,11 @@ public class LeaveService {
         request.setOrgUnitId(applicant.getOrgUnitId());
         request.setLeaveTypeId(leaveType.getId());
         request.setApprovalRuleId(rule.getId());
-        request.setApplicantNameSnapshot(resolveApplicantNameSnapshot(applicantType, applicant, dto));
+        request.setApplicantNameSnapshot(applicantNameSnapshot);
         request.setApplicantType(applicantType);
         request.setPositionLevelCode(resolvePositionLevel(applicantType, applicant.getPositionLevelCode()));
-        request.setJobTitleSnapshot(dto.getJobTitle().trim());
-        request.setTeamLeaderSnapshot(dto.getTeamLeaderInfo().trim());
+        request.setJobTitleSnapshot(dto.getJobTitleSnapshot().trim());
+        request.setTeamLeaderSnapshot(dto.getTeamLeaderSnapshot().trim());
         request.setStartTime(dto.getStartTime());
         request.setEndTime(dto.getEndTime());
         request.setStartDate(dto.getStartTime().toLocalDate());
@@ -167,6 +173,66 @@ public class LeaveService {
         }
 
         return getLeaveDetail(request.getId());
+    }
+
+    @Transactional
+    public LeaveDetailResponse updateRejectedLeave(Long leaveId, CreateLeaveRequestDto dto) {
+        UserAccount operator = requireCurrentUser();
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        ensureEditableRejectedByAdmin(operator, request);
+
+        UserAccount applicant = resolveApplicant(dto);
+        LeaveType leaveType = requireLeaveType(dto.getLeaveTypeId());
+
+        String applicantType = normalizeApplicantType(dto.getApplicantType());
+        BigDecimal allowedDays = leaveType.getDefaultDays() == null ? null : BigDecimal.valueOf(leaveType.getDefaultDays());
+        boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(30)) > 0;
+        ApprovalRule rule = resolveApprovalRule(applicantType, applicant.getPositionLevelCode(), leaveType, dto.getLeaveDays(), exceedsOneMonth);
+        String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
+        validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
+        List<ApprovalRuleStep> steps = prepareCreationSteps(rule.getId(), operator, applicantType, leaveType);
+
+        request.setRequestNo(generateRequestNo());
+        request.setApplicantId(applicant.getId());
+        request.setOrgUnitId(applicant.getOrgUnitId());
+        request.setLeaveTypeId(leaveType.getId());
+        request.setApprovalRuleId(rule.getId());
+        request.setApplicantNameSnapshot(applicantNameSnapshot);
+        request.setApplicantType(applicantType);
+        request.setPositionLevelCode(resolvePositionLevel(applicantType, applicant.getPositionLevelCode()));
+        request.setJobTitleSnapshot(dto.getJobTitleSnapshot().trim());
+        request.setTeamLeaderSnapshot(dto.getTeamLeaderSnapshot().trim());
+        request.setStartTime(dto.getStartTime());
+        request.setEndTime(dto.getEndTime());
+        request.setStartDate(dto.getStartTime().toLocalDate());
+        request.setEndDate(dto.getEndTime().toLocalDate());
+        request.setLeaveDays(dto.getLeaveDays());
+        request.setAllowedDays(allowedDays);
+        request.setExceedsOneMonth(exceedsOneMonth ? 1 : 0);
+        request.setReason(dto.getReason());
+        request.setRemark(dto.getRemark());
+        request.setStatus(LeaveRequestStatus.PENDING);
+        request.setCurrentStep(steps.get(0).getStepNo());
+        request.setCurrentActionType(steps.get(0).getActionType());
+        request.setSubmittedAt(LocalDateTime.now());
+        request.setFinalApprovedAt(null);
+        leaveRequestMapper.updateEditableRejected(request);
+
+        leaveApprovalMapper.deleteByLeaveRequestId(leaveId);
+        for (ApprovalRuleStep step : steps) {
+            UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
+            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approver == null ? null : approver.getId()));
+        }
+        return getLeaveDetail(leaveId);
+    }
+
+    @Transactional
+    public void deleteRejectedLeave(Long leaveId) {
+        UserAccount operator = requireCurrentUser();
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        ensureEditableRejectedByAdmin(operator, request);
+        leaveApprovalMapper.deleteByLeaveRequestId(leaveId);
+        leaveRequestMapper.deleteById(leaveId);
     }
 
     @Transactional
@@ -204,7 +270,7 @@ public class LeaveService {
         UserAccount operator = requireCurrentUser();
         LeaveRequest request = requireLeaveRequest(leaveId);
         ensureNotCancelled(request);
-        LeaveApproval pending = requirePendingApproval(leaveId);
+        LeaveApproval pending = requireCurrentPendingApproval(request);
         if (!ACTION_APPROVE.equals(pending.getActionType())) {
             throw new BizException("当前节点不是审批节点，不能上传审批签名");
         }
@@ -215,21 +281,19 @@ public class LeaveService {
             throw new BizException("当前审批节点不要求上传电子签名");
         }
 
-        try {
-            String signatureUrl = saveSignatureFile(
-                    leaveId,
-                    pending.getStepNo(),
-                    dto.getSignatureFile().getOriginalFilename(),
-                    dto.getSignatureFile().getInputStream()
-            );
-            return ApprovalSignatureUploadResponse.builder()
-                    .leaveId(leaveId)
-                    .stepNo(pending.getStepNo())
-                    .signatureUrl(signatureUrl)
-                    .build();
-        } catch (IOException ex) {
-            throw new BizException("电子签名上传失败");
+        if (dto != null && dto.getSignatureFile() != null && !dto.getSignatureFile().isEmpty()) {
+            throw new BizException("电子签名只能由超级管理员预先上传，审批时不允许临时上传");
         }
+
+        String signatureUrl = normalizeSignatureUrl(operator.getSignatureUrl());
+        if (signatureUrl == null || signatureUrl.isBlank()) {
+            throw new BizException("当前账号未配置电子签名，无法审批");
+        }
+        return ApprovalSignatureUploadResponse.builder()
+                .leaveId(leaveId)
+                .stepNo(pending.getStepNo())
+                .signatureUrl(signatureUrl)
+                .build();
     }
 
     @Transactional
@@ -237,7 +301,7 @@ public class LeaveService {
         UserAccount operator = requireCurrentUser();
         LeaveRequest request = requireLeaveRequest(leaveId);
         ensureNotCancelled(request);
-        LeaveApproval pending = requirePendingApproval(leaveId);
+        LeaveApproval pending = requireCurrentPendingApproval(request);
         if (!ACTION_SELECT.equals(pending.getActionType())) {
             throw new BizException("当前节点不是选择审批人节点");
         }
@@ -252,7 +316,7 @@ public class LeaveService {
 
         decideApproval(pending, operator.getId(), true, dto.getComment(), null);
 
-        List<LeaveApproval> targets = resolveOrCreateSelectedApprovalTargets(request, currentRuleStep, selectedUsers.size());
+        List<LeaveApproval> targets = resolveOrCreateSelectedApprovalTargets(request, currentRuleStep, selectedUsers);
 
         for (int i = 0; i < selectedUsers.size(); i++) {
             LeaveApproval target = targets.get(i);
@@ -266,18 +330,24 @@ public class LeaveService {
 
     private List<LeaveApproval> resolveOrCreateSelectedApprovalTargets(LeaveRequest request,
                                                                        ApprovalRuleStep currentRuleStep,
-                                                                       int targetCount) {
+                                                                       List<UserAccount> selectedUsers) {
+        int targetCount = selectedUsers.size();
         List<ApprovalRuleStep> selectedSteps = requireRuleSteps(request.getApprovalRuleId()).stream()
                 .filter(step -> step.getStepNo() > currentRuleStep.getStepNo())
                 .filter(step -> ACTION_APPROVE.equals(step.getActionType()))
                 .filter(step -> APPROVER_SOURCE_SELECTED.equals(step.getApproverSource()))
                 .filter(step -> currentRuleStep.getCandidateGroup() == null
                         || currentRuleStep.getCandidateGroup().equals(step.getCandidateGroup()))
-                .limit(targetCount)
                 .collect(Collectors.toList());
+        if (SelectionScenario.SECTION_LEVEL.equals(determineSelectionScenario(request))) {
+            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers);
+        }
         if (selectedSteps.size() < targetCount) {
             throw new BizException("后续领导审批节点配置不完整");
         }
+        selectedSteps = selectedSteps.stream()
+                .limit(targetCount)
+                .collect(Collectors.toList());
 
         List<LeaveApproval> approvals = leaveApprovalMapper.findByLeaveRequestId(request.getId());
         List<LeaveApproval> targets = new ArrayList<>();
@@ -296,6 +366,21 @@ public class LeaveService {
             targets.add(target);
         }
         return targets;
+    }
+
+    private List<ApprovalRuleStep> sortSectionLevelSelectedSteps(List<ApprovalRuleStep> selectedSteps,
+                                                                 List<UserAccount> selectedUsers) {
+        java.util.Map<String, ApprovalRuleStep> stepByRoleCode = selectedSteps.stream()
+                .collect(Collectors.toMap(ApprovalRuleStep::getApproverRoleCode, step -> step, (left, right) -> left));
+        List<ApprovalRuleStep> orderedSteps = new ArrayList<>();
+        for (UserAccount user : selectedUsers) {
+            ApprovalRuleStep step = stepByRoleCode.get(user.getRoleCode());
+            if (step == null) {
+                throw new BizException("所选领导与审批节点配置不匹配");
+            }
+            orderedSteps.add(step);
+        }
+        return orderedSteps;
     }
 
     @Transactional
@@ -380,9 +465,40 @@ public class LeaveService {
                 .build();
     }
 
+    public BatchLeavePdfResponse batchDownloadPdf(BatchLeavePdfRequest dto) {
+        UserAccount operator = requireCurrentUser();
+        if (!RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())) {
+            throw new BizException("只有考勤管理员可以批量下载请假记录单");
+        }
+
+        List<LeaveRequest> requests = loadApprovedRequestsForBatchDownload(operator, dto);
+        List<Path> pdfPaths = new ArrayList<>();
+        for (LeaveRequest request : requests) {
+            LeaveDetailResponse detail = getLeaveDetail(request.getId());
+            if (detail.getPdfUrl() == null || detail.getPdfUrl().isBlank()) {
+                throw new BizException("请假单 PDF 生成失败: " + request.getRequestNo());
+            }
+            Path pdfPath = leaveDocumentService.resolveStoredFilePath(detail.getPdfUrl());
+            if (pdfPath == null) {
+                throw new BizException("请假单 PDF 文件不存在: " + request.getRequestNo());
+            }
+            pdfPaths.add(pdfPath);
+        }
+
+        String pdfUrl = leaveDocumentService.generateMergedPdf(pdfPaths);
+        return BatchLeavePdfResponse.builder()
+                .pdfUrl(pdfUrl)
+                .recordCount(requests.size())
+                .build();
+    }
+
     public List<SelectedApproverResponse> getSelectedApprovers(Long leaveId) {
         LeaveRequest request = requireLeaveRequest(leaveId);
-        LeaveApproval pending = requirePendingApproval(leaveId);
+        LeaveApproval pending = requireCurrentPendingApproval(request);
+        if (!LeaveRequestStatus.PENDING.equals(request.getStatus())
+                && !LeaveRequestStatus.APPROVING.equals(request.getStatus())) {
+            throw new BizException("当前请假单状态不允许审批");
+        }
         if (!ACTION_SELECT.equals(pending.getActionType())) {
             return List.of();
         }
@@ -403,24 +519,23 @@ public class LeaveService {
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
         int offset = (safePageNum - 1) * safePageSize;
+        LocalDateTime monthStart = currentMonthStart();
+        LocalDateTime monthEnd = monthStart.plusMonths(1);
 
         Long total;
         List<LeaveListItemResponse> records;
         if (shouldUsePendingApproverView(operator)) {
             total = leaveRequestMapper.countByResponsibleApprover(
-                    operator.getId(), operator.getRoleCode(), operator.getOrgUnitId(), normalizedStatus, leaveTypeId);
-            records = leaveRequestMapper.findPageByResponsibleApprover(
-                            operator.getId(), operator.getRoleCode(), operator.getOrgUnitId(), normalizedStatus, leaveTypeId, offset, safePageSize)
-                    .stream()
-                    .map(this::toLeaveListItemResponse)
-                    .collect(Collectors.toList());
+                    operator.getId(), operator.getRoleCode(), operator.getOrgUnitId(), normalizedStatus, leaveTypeId, monthStart, monthEnd);
+            List<LeaveRequest> requests = leaveRequestMapper.findPageByResponsibleApprover(
+                    operator.getId(), operator.getRoleCode(), operator.getOrgUnitId(), normalizedStatus, leaveTypeId,
+                    monthStart, monthEnd, offset, safePageSize);
+            records = toLeaveListItemResponses(requests);
         } else {
-            total = leaveRequestMapper.countByScope(orgUnitId, applicantId, normalizedStatus, leaveTypeId);
-            records = leaveRequestMapper
-                    .findPageByScope(orgUnitId, applicantId, normalizedStatus, leaveTypeId, offset, safePageSize)
-                    .stream()
-                    .map(this::toLeaveListItemResponse)
-                    .collect(Collectors.toList());
+            total = leaveRequestMapper.countByScope(orgUnitId, applicantId, normalizedStatus, leaveTypeId, monthStart, monthEnd);
+            List<LeaveRequest> requests = leaveRequestMapper.findPageByScope(
+                    orgUnitId, applicantId, normalizedStatus, leaveTypeId, monthStart, monthEnd, offset, safePageSize);
+            records = toLeaveListItemResponses(requests);
         }
         return PageResponse.<LeaveListItemResponse>builder()
                 .total(total == null ? 0L : total)
@@ -428,6 +543,53 @@ public class LeaveService {
                 .pageSize(safePageSize)
                 .records(records)
                 .build();
+    }
+
+    public PageResponse<LeaveListItemResponse> listRecentThreeMonthApprovalLeaves(String status,
+                                                                                  Long leaveTypeId,
+                                                                                  Integer pageNum,
+                                                                                  Integer pageSize) {
+        UserAccount operator = requireCurrentUser();
+        String normalizedStatus = normalizeListStatus(operator, status);
+        Long orgUnitId = null;
+        Long applicantId = null;
+        if ("ORG".equals(operator.getDataScope())) {
+            orgUnitId = operator.getOrgUnitId();
+        } else if (!"ALL".equals(operator.getDataScope())) {
+            applicantId = operator.getId();
+        }
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePageNum - 1) * safePageSize;
+        LocalDateTime monthEnd = currentMonthStart().plusMonths(1);
+        LocalDateTime monthStart = currentMonthStart().minusMonths(2);
+
+        Long total = leaveRequestMapper.countByScope(
+                orgUnitId, applicantId, normalizedStatus, leaveTypeId, monthStart, monthEnd);
+        List<LeaveRequest> requests = leaveRequestMapper.findPageByScope(
+                orgUnitId, applicantId, normalizedStatus, leaveTypeId, monthStart, monthEnd, offset, safePageSize);
+        List<LeaveListItemResponse> records = toLeaveListItemResponses(requests);
+        return PageResponse.<LeaveListItemResponse>builder()
+                .total(total == null ? 0L : total)
+                .pageNum(safePageNum)
+                .pageSize(safePageSize)
+                .records(records)
+                .build();
+    }
+
+    private List<LeaveListItemResponse> toLeaveListItemResponses(List<LeaveRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return List.of();
+        }
+        List<Long> leaveRequestIds = requests.stream()
+                .map(LeaveRequest::getId)
+                .toList();
+        java.util.Map<Long, List<String>> approvedRolesByLeaveId = buildApprovedRolesByLeaveId(leaveRequestIds);
+        return requests.stream()
+                .map(request -> toLeaveListItemResponse(
+                        request,
+                        approvedRolesByLeaveId.getOrDefault(request.getId(), List.of())))
+                .collect(Collectors.toList());
     }
 
     public PendingSummaryResponse getPendingSummary() {
@@ -468,7 +630,7 @@ public class LeaveService {
         );
     }
 
-    private LeaveListItemResponse toLeaveListItemResponse(LeaveRequest request) {
+    private LeaveListItemResponse toLeaveListItemResponse(LeaveRequest request, List<String> approvedRoles) {
         LeaveType leaveType = requireLeaveType(request.getLeaveTypeId());
         return LeaveListItemResponse.builder()
                 .id(request.getId())
@@ -485,11 +647,70 @@ public class LeaveService {
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .leaveDays(request.getLeaveDays())
+                .jobTitleSnapshot(request.getJobTitleSnapshot())
                 .teamLeaderSnapshot(request.getTeamLeaderSnapshot())
                 .reason(request.getReason())
                 .remark(request.getRemark())
                 .submittedAt(request.getSubmittedAt())
+                .approvedRoles(approvedRoles)
                 .build();
+    }
+
+    private java.util.Map<Long, List<String>> buildApprovedRolesByLeaveId(List<Long> leaveRequestIds) {
+        if (leaveRequestIds == null || leaveRequestIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        java.util.Map<Long, LinkedHashMap<String, Boolean>> roleSetByLeaveId = new java.util.HashMap<>();
+        for (LeaveApproval approval : leaveApprovalMapper.findByLeaveRequestIds(leaveRequestIds)) {
+            if (!ApprovalStatus.APPROVED.equals(approval.getApprovalStatus())) {
+                continue;
+            }
+            if (!ACTION_APPROVE.equals(approval.getActionType())) {
+                continue;
+            }
+            if (approval.getApproverRoleCode() == null || approval.getApproverRoleCode().isBlank()) {
+                continue;
+            }
+            roleSetByLeaveId
+                    .computeIfAbsent(approval.getLeaveRequestId(), key -> new LinkedHashMap<>())
+                    .putIfAbsent(approval.getApproverRoleCode(), Boolean.TRUE);
+        }
+
+        java.util.Map<Long, List<String>> approvedRolesByLeaveId = new java.util.HashMap<>();
+        roleSetByLeaveId.forEach((leaveId, roleSet) ->
+                approvedRolesByLeaveId.put(leaveId, new ArrayList<>(roleSet.keySet())));
+        return approvedRolesByLeaveId;
+    }
+
+    private List<LeaveRequest> loadApprovedRequestsForBatchDownload(UserAccount operator, BatchLeavePdfRequest dto) {
+        LocalDate startDate = dto == null ? null : dto.getStartDate();
+        LocalDate endDate = dto == null ? null : dto.getEndDate();
+        if (startDate == null || endDate == null) {
+            throw new BizException("请填写请假时间段");
+        }
+        if (endDate.isBefore(startDate)) {
+            throw new BizException("结束日期不能早于开始日期");
+        }
+        List<LeaveRequest> requests = leaveRequestMapper.findApprovedByDateRange(operator.getOrgUnitId(), startDate, endDate);
+        if (requests.isEmpty()) {
+            throw new BizException("该时间段内没有已审批完成的请假记录单");
+        }
+        return requests;
+    }
+
+    private void ensureEditableRejectedByAdmin(UserAccount operator, LeaveRequest request) {
+        if (!RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())) {
+            throw new BizException("只有考勤管理员可以操作驳回请假单");
+        }
+        if (!LeaveRequestStatus.REJECTED.equals(request.getStatus()) && !LeaveRequestStatus.PENDING.equals(request.getStatus())) {
+            throw new BizException("当前请假单不是已驳回或待审批状态");
+        }
+        if (!operator.getId().equals(request.getSubmittedBy())) {
+            throw new BizException("只能操作本人发起的驳回请假单");
+        }
+        if (!operator.getOrgUnitId().equals(request.getOrgUnitId())) {
+            throw new BizException("只能操作本单位的驳回请假单");
+        }
     }
 
     private void ensureNotCancelled(LeaveRequest request) {
@@ -503,33 +724,22 @@ public class LeaveService {
                                                 String signatureUrl, BatchSignaturePayload batchSignaturePayload) {
         LeaveRequest request = requireLeaveRequest(leaveId);
         ensureNotCancelled(request);
-        LeaveApproval pending = requirePendingApproval(leaveId);
+        LeaveApproval pending = requireCurrentPendingApproval(request);
+        if (!LeaveRequestStatus.PENDING.equals(request.getStatus())
+                && !LeaveRequestStatus.APPROVING.equals(request.getStatus())) {
+            throw new BizException("当前请假单状态不允许审批");
+        }
         if (!ACTION_APPROVE.equals(pending.getActionType())) {
             throw new BizException("当前节点不是审批节点");
         }
         ensureCurrentActor(operator, request, pending);
 
+        String finalSignatureUrl = normalizeSignatureUrl(operator.getSignatureUrl());
         boolean signatureRequired = leaveSignRequirementService.isSignatureRequired(operator.getRoleCode(), request.getLeaveTypeId());
-        String finalSignatureUrl = normalizeSignatureUrl(signatureUrl);
+        ensureNoTemporarySignatureOverride(signatureFile, signatureUrl, batchSignaturePayload, finalSignatureUrl);
         if (signatureRequired) {
-            boolean noUploadFile = (signatureFile == null || signatureFile.isEmpty()) && batchSignaturePayload == null;
-            if (noUploadFile && (finalSignatureUrl == null || finalSignatureUrl.isBlank())) {
-                throw new BizException("当前审批节点必须上传电子签名");
-            }
-        }
-        if (signatureFile != null && !signatureFile.isEmpty()) {
-            try {
-                finalSignatureUrl = saveSignatureFile(leaveId, pending.getStepNo(),
-                        signatureFile.getOriginalFilename(), signatureFile.getInputStream());
-            } catch (IOException ex) {
-                throw new BizException("电子签名上传失败");
-            }
-        } else if (batchSignaturePayload != null) {
-            try {
-                finalSignatureUrl = saveSignatureFile(leaveId, pending.getStepNo(),
-                        batchSignaturePayload.originalFilename(), new java.io.ByteArrayInputStream(batchSignaturePayload.bytes()));
-            } catch (IOException ex) {
-                throw new BizException("电子签名上传失败");
+            if (finalSignatureUrl == null || finalSignatureUrl.isBlank()) {
+                throw new BizException("当前账号未配置电子签名，无法审批");
             }
         }
 
@@ -551,6 +761,10 @@ public class LeaveService {
         return !RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())
                 && !RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())
                 && !"NONE".equals(operator.getApprovalScope());
+    }
+
+    private LocalDateTime currentMonthStart() {
+        return LocalDate.now().withDayOfMonth(1).atStartOfDay();
     }
 
     private String normalizeListStatus(UserAccount operator, String status) {
@@ -596,9 +810,9 @@ public class LeaveService {
     }
 
     private ApprovalRule resolveApprovalRule(String applicantType, String actualPositionLevel, LeaveType leaveType, BigDecimal leaveDays, boolean exceedsOneMonth) {
-        String positionLevel = resolvePositionLevel(applicantType, actualPositionLevel);
         String leaveScope = resolveLeaveScope(leaveType);
-        String ruleApplicantType = resolveRuleApplicantType(applicantType);
+        String positionLevel = resolveRulePositionLevel(applicantType, actualPositionLevel, leaveScope);
+        String ruleApplicantType = resolveRuleApplicantType(applicantType, leaveScope);
 
         return approvalRuleMapper.findActiveRules(ruleApplicantType, positionLevel).stream()
                 .filter(rule -> matchesScope(rule.getLeaveScope(), leaveScope))
@@ -643,7 +857,7 @@ public class LeaveService {
         return APPLICANT_TYPE_CADRE.equals(applicantType) ? POSITION_GENERAL_CADRE : POSITION_STAFF;
     }
 
-    private String normalizeApplicantType(String applicantType, String actualPositionLevel) {
+    private String normalizeApplicantType(String applicantType) {
         if (applicantType == null || applicantType.isBlank()) {
             throw new BizException("人员类别不能为空");
         }
@@ -651,23 +865,13 @@ public class LeaveService {
             return APPLICANT_TYPE_EMPLOYEE;
         }
         if (APPLICANT_TYPE_CADRE.equalsIgnoreCase(applicantType)) {
-            return POSITION_SECTION_LEVEL.equals(actualPositionLevel)
-                    ? APPLICANT_TYPE_SECTION_LEVEL_CADRE
-                    : APPLICANT_TYPE_GENERAL_CADRE;
-        }
-        if (APPLICANT_TYPE_GENERAL_CADRE.equalsIgnoreCase(applicantType)) {
-            if (POSITION_SECTION_LEVEL.equals(actualPositionLevel)) {
-                throw new BizException("该人员岗位级别为中层正职，请选择中层正职");
-            }
             return APPLICANT_TYPE_GENERAL_CADRE;
         }
-        System.out.println(actualPositionLevel);
-        System.out.println(POSITION_SECTION_LEVEL.equals(actualPositionLevel));
+        if (APPLICANT_TYPE_GENERAL_CADRE.equalsIgnoreCase(applicantType)) {
+            return APPLICANT_TYPE_GENERAL_CADRE;
+        }
         if (APPLICANT_TYPE_SECTION_LEVEL_CADRE.equalsIgnoreCase(applicantType)
                 || POSITION_SECTION_LEVEL.equalsIgnoreCase(applicantType)) {
-            if (!POSITION_SECTION_LEVEL.equals(actualPositionLevel)) {
-                throw new BizException("该人员不是中层正职，不能选择中层正职");
-            }
             return APPLICANT_TYPE_SECTION_LEVEL_CADRE;
         }
         throw new BizException("人员类别只能是 职工、一般干部、中层正职");
@@ -705,17 +909,17 @@ public class LeaveService {
         return LEAVE_SCOPE_OTHER;
     }
 
-    private void validateLeaveRequestRules(UserAccount applicant, LeaveType leaveType, CreateLeaveRequestDto dto) {
+    private void validateLeaveRequestRules(String applicantNameSnapshot, LeaveType leaveType, CreateLeaveRequestDto dto) {
         if (dto.getStartTime().isAfter(dto.getEndTime())) {
             throw new BizException("结束时间不能早于开始时间");
         }
         if (!LEAVE_SCOPE_PERSONAL.equals(resolveLeaveScope(leaveType))) {
             return;
         }
-        validatePersonalLeaveRules(applicant, dto);
+        validatePersonalLeaveRules(applicantNameSnapshot, dto);
     }
 
-    private void validatePersonalLeaveRules(UserAccount applicant, CreateLeaveRequestDto dto) {
+    private void validatePersonalLeaveRules(String applicantNameSnapshot, CreateLeaveRequestDto dto) {
         BigDecimal leaveDays = dto.getLeaveDays();
         if (leaveDays == null) {
             return;
@@ -735,7 +939,7 @@ public class LeaveService {
         java.time.LocalDate yearEnd = startDate.withDayOfYear(startDate.lengthOfYear());
 
         if (leaveDays.compareTo(DAY_1) <= 0) {
-            long monthlyCount = countPersonalLeave(applicant.getId(), monthStart, monthEnd, null, DAY_1);
+            long monthlyCount = countPersonalLeave(applicantNameSnapshot, monthStart, monthEnd, null, DAY_1);
             if (monthlyCount >= 3) {
                 throw new BizException("单次请事假1天以内的每月不得超过3次");
             }
@@ -743,20 +947,20 @@ public class LeaveService {
         }
 
         if (leaveDays.compareTo(DAY_2) >= 0 && leaveDays.compareTo(DAY_5) < 0) {
-            long monthlyCount = countPersonalLeave(applicant.getId(), monthStart, monthEnd, DAY_2, BigDecimal.valueOf(4.99));
+            long monthlyCount = countPersonalLeave(applicantNameSnapshot, monthStart, monthEnd, DAY_2, BigDecimal.valueOf(4.99));
             if (monthlyCount >= 2) {
                 throw new BizException("单次请事假2天及以上至5天以内的每月不得超过2次");
             }
-            long quarterCount = countPersonalLeave(applicant.getId(), quarterStart, quarterEnd, DAY_2, BigDecimal.valueOf(4.99));
+            long quarterCount = countPersonalLeave(applicantNameSnapshot, quarterStart, quarterEnd, DAY_2, BigDecimal.valueOf(4.99));
             if (quarterCount >= 3) {
                 throw new BizException("单次请事假2天及以上至5天以内的季度内不得超过3次");
             }
-            ensureNoContinuousPersonalLeave(applicant.getId(), startDate, endDate);
+            ensureNoContinuousPersonalLeave(applicantNameSnapshot, startDate, endDate);
             return;
         }
 
         if (leaveDays.compareTo(DAY_5) >= 0 && leaveDays.compareTo(DAY_10) < 0) {
-            long yearlyCount = countPersonalLeave(applicant.getId(), yearStart, yearEnd, DAY_5, BigDecimal.valueOf(9.99));
+            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_5, BigDecimal.valueOf(9.99));
             if (yearlyCount >= 3) {
                 throw new BizException("单次请事假5天及以上至10天以内的年度内不得超过3次");
             }
@@ -764,7 +968,7 @@ public class LeaveService {
         }
 
         if (leaveDays.compareTo(DAY_10) >= 0 && leaveDays.compareTo(DAY_30) < 0) {
-            long yearlyCount = countPersonalLeave(applicant.getId(), yearStart, yearEnd, DAY_10, BigDecimal.valueOf(29.99));
+            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_10, BigDecimal.valueOf(29.99));
             if (yearlyCount >= 3) {
                 throw new BizException("单次请事假10天及以上至30天以内的年度内不得超过3次");
             }
@@ -772,17 +976,17 @@ public class LeaveService {
         }
 
         if (leaveDays.compareTo(DAY_30) >= 0) {
-            long yearlyCount = countPersonalLeave(applicant.getId(), yearStart, yearEnd, DAY_30, null);
+            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_30, null);
             if (yearlyCount >= 2) {
                 throw new BizException("单次请事假30天及以上的年度内不得超过2次");
             }
         }
     }
 
-    private long countPersonalLeave(Long applicantId, java.time.LocalDate periodStart, java.time.LocalDate periodEnd,
+    private long countPersonalLeave(String applicantNameSnapshot, java.time.LocalDate periodStart, java.time.LocalDate periodEnd,
                                     BigDecimal minDays, BigDecimal maxDays) {
         Long count = leaveRequestMapper.countLeaveRequestsByApplicantAndRange(
-                applicantId,
+                applicantNameSnapshot,
                 requirePersonalLeaveTypeId(),
                 EFFECTIVE_LEAVE_STATUSES,
                 periodStart,
@@ -793,9 +997,9 @@ public class LeaveService {
         return count == null ? 0L : count;
     }
 
-    private void ensureNoContinuousPersonalLeave(Long applicantId, java.time.LocalDate startDate, java.time.LocalDate endDate) {
+    private void ensureNoContinuousPersonalLeave(String applicantNameSnapshot, java.time.LocalDate startDate, java.time.LocalDate endDate) {
         LeaveRequest adjacent = leaveRequestMapper.findFirstOverlappingOrAdjacent(
-                applicantId,
+                applicantNameSnapshot,
                 requirePersonalLeaveTypeId(),
                 EFFECTIVE_LEAVE_STATUSES,
                 startDate.minusDays(1),
@@ -827,6 +1031,111 @@ public class LeaveService {
         return steps;
     }
 
+    private List<ApprovalRuleStep> prepareCreationSteps(Long ruleId,
+                                                        UserAccount operator,
+                                                        String applicantType,
+                                                        LeaveType leaveType) {
+        List<ApprovalRuleStep> ruleSteps = requireRuleSteps(ruleId);
+        List<ApprovalRuleStep> effectiveRuleSteps = shouldSkipHrApproval(operator, applicantType, leaveType)
+                ? ruleSteps.stream().filter(step -> !isHrApprovalStep(step)).collect(Collectors.toList())
+                : ruleSteps;
+        ensureInitialOrgPrincipalStepKept(ruleSteps, effectiveRuleSteps);
+        if (effectiveRuleSteps.isEmpty()) {
+            throw new BizException("审批规则未配置有效步骤");
+        }
+        log.info("创建请假审批流: operatorId={}, operatorOrgUnitId={}, ruleId={}, originalSteps={}, finalSteps={}",
+                operator == null ? null : operator.getId(),
+                operator == null ? null : operator.getOrgUnitId(),
+                ruleId,
+                describeStepNos(ruleSteps),
+                describeStepNos(effectiveRuleSteps));
+        return effectiveRuleSteps;
+    }
+
+    private boolean shouldSkipHrApproval(UserAccount operator, String applicantType, LeaveType leaveType) {
+        if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) && isHrAttendanceAdmin(operator)) {
+            return true;
+        }
+        if (leaveType == null || leaveType.getLeaveCode() == null) {
+            return false;
+        }
+        if (!HR_APPROVAL_EXEMPT_LEAVE_CODES.contains(leaveType.getLeaveCode())) {
+            return false;
+        }
+        return APPLICANT_TYPE_EMPLOYEE.equals(applicantType)
+                || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
+                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType);
+    }
+
+    private boolean isHrApprovalStep(ApprovalRuleStep step) {
+        return ACTION_APPROVE.equals(step.getActionType())
+                && APPROVER_SOURCE_HR_ORG.equals(step.getApproverSource())
+                && RoleCode.HR_SECTION_CHIEF.equals(step.getApproverRoleCode());
+    }
+
+    private void ensureInitialOrgPrincipalStepKept(List<ApprovalRuleStep> ruleSteps, List<ApprovalRuleStep> finalSteps) {
+        boolean ruleRequiresInitialOrgApproval = ruleSteps.stream()
+                .anyMatch(this::isInitialOrgPrincipalApproval);
+        if (!ruleRequiresInitialOrgApproval) {
+            return;
+        }
+        boolean finalKeepsInitialOrgApproval = finalSteps.stream()
+                .anyMatch(this::isInitialOrgPrincipalApproval);
+        if (!finalKeepsInitialOrgApproval) {
+            throw new BizException("非劳动人事科发起请假必须经过科室车间负责人审批");
+        }
+    }
+
+    private String describeStepNos(List<ApprovalRuleStep> steps) {
+        return steps.stream()
+                .map(step -> step.getStepNo() + ":" + step.getApproverRoleCode() + ":" + step.getActionType())
+                .collect(Collectors.joining(","));
+    }
+
+    private boolean isInitialOrgPrincipalApproval(ApprovalRuleStep step) {
+        return Integer.valueOf(1).equals(step.getStepNo())
+                && ACTION_APPROVE.equals(step.getActionType())
+                && RoleCode.ORG_PRINCIPAL.equals(step.getApproverRoleCode());
+    }
+
+    private boolean isHrAttendanceAdmin(UserAccount operator) {
+        if (operator == null || !RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())) {
+            return false;
+        }
+        return isHrOrgUnit(operator.getOrgUnitId());
+    }
+
+    private boolean isHrOrgUnit(Long orgUnitId) {
+        if (orgUnitId == null) {
+            return false;
+        }
+        OrgUnit orgUnit = orgUnitMapper.findById(orgUnitId);
+        if (orgUnit == null) {
+            return false;
+        }
+        String orgCode = orgUnit.getOrgCode() == null ? "" : orgUnit.getOrgCode().trim();
+        String orgName = orgUnit.getOrgName() == null ? "" : orgUnit.getOrgName().trim();
+        return "D04".equalsIgnoreCase(orgCode) || orgName.contains("劳动人事科");
+    }
+
+    private ApprovalRuleStep toHrApprovalStep(ApprovalRuleStep source) {
+        ApprovalRuleStep step = new ApprovalRuleStep();
+        step.setId(source.getId());
+        step.setRuleId(source.getRuleId());
+        step.setStepNo(source.getStepNo());
+        step.setActionType(ACTION_APPROVE);
+        step.setAssigneeCount(0);
+        step.setCandidateGroup(source.getCandidateGroup());
+        step.setStepCode("HR_APPROVE");
+        step.setStepCodeName("劳动人事科科长审批");
+        step.setStepName("劳动人事科科长审批（电子签名）");
+        step.setApproverSource(APPROVER_SOURCE_HR_ORG);
+        step.setApproverRoleCode(RoleCode.HR_SECTION_CHIEF);
+        step.setApproverRoleName("劳动人事科科长");
+        step.setReturnToOrg(source.getReturnToOrg());
+        return step;
+    }
+
     private ApprovalRuleStep requireRuleStep(Long ruleId, Long ruleStepId) {
         return requireRuleSteps(ruleId).stream()
                 .filter(step -> step.getId().equals(ruleStepId))
@@ -835,6 +1144,11 @@ public class LeaveService {
     }
 
     private UserAccount resolveInitialApprover(Long applicantOrgUnitId, ApprovalRuleStep step) {
+        if (APPROVER_SOURCE_APPLICANT_ORG.equals(step.getApproverSource())
+                && RoleCode.ORG_PRINCIPAL.equals(step.getApproverRoleCode())
+                && isHrOrgUnit(applicantOrgUnitId)) {
+            return userAccountMapper.findByRole(RoleCode.HR_SECTION_CHIEF);
+        }
         if (APPROVER_SOURCE_APPLICANT_ORG.equals(step.getApproverSource())) {
             return userAccountMapper.findByOrgAndRole(applicantOrgUnitId, step.getApproverRoleCode());
         }
@@ -851,6 +1165,7 @@ public class LeaveService {
                                                                   LeaveApproval pending,
                                                                   ApprovalRuleStep currentRuleStep,
                                                                   List<Long> approverUserIds) {
+        SelectionScenario scenario = determineSelectionScenario(request);
         List<SelectedApproverResponse> selectableApprovers = resolveSelectableApprovers(request, pending, currentRuleStep);
         if (selectableApprovers.isEmpty()) {
             throw new BizException("当前节点无可选领导");
@@ -870,9 +1185,11 @@ public class LeaveService {
             throw new BizException("选择审批人数不正确");
         }
 
-        return approverUserIds.stream()
+        List<UserAccount> selectedUsers = approverUserIds.stream()
                 .map(this::requireUser)
                 .collect(Collectors.toList());
+        validateSelectedApproverRoles(scenario, selectedUsers);
+        return selectedUsers;
     }
 
     private List<SelectedApproverResponse> resolveSelectableApprovers(LeaveRequest request,
@@ -880,7 +1197,13 @@ public class LeaveService {
                                                                       ApprovalRuleStep currentRuleStep) {
         List<UserAccount> candidates = switch (determineSelectionScenario(request)) {
             case SICK_WITHIN_MONTH -> findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER));
-            case SICK_OVER_MONTH, PERSONAL_10_TO_30 -> findEnabledUsersByRoles(resolveStationmasterCandidateRoles(request));
+            case SICK_OVER_MONTH -> resolveSickOverMonthCandidates(currentRuleStep);
+            case SECTION_LEVEL -> findEnabledUsersByRoles(List.of(
+                    RoleCode.DEPUTY_STATIONMASTER,
+                    RoleCode.STATIONMASTER,
+                    RoleCode.PARTY_SECRETARY));
+            case PERSONAL_5_TO_10 -> findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER));
+            case PERSONAL_10_TO_30 -> findEnabledUsersByRoles(resolveStationmasterCandidateRoles(request));
             case PERSONAL_OVER_30 -> findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER, RoleCode.PARTY_SECRETARY));
             case NONE -> List.of();
         };
@@ -896,6 +1219,35 @@ public class LeaveService {
                         .candidateGroup(resolveCandidateGroupByRole(user.getRoleCode()))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private void validateSelectedApproverRoles(SelectionScenario scenario, List<UserAccount> selectedUsers) {
+        if (!SelectionScenario.SECTION_LEVEL.equals(scenario)) {
+            return;
+        }
+        long deputyCount = selectedUsers.stream()
+                .filter(user -> RoleCode.DEPUTY_STATIONMASTER.equals(user.getRoleCode()))
+                .count();
+        long stationmasterCount = selectedUsers.stream()
+                .filter(user -> RoleCode.STATIONMASTER.equals(user.getRoleCode()))
+                .count();
+        long partySecretaryCount = selectedUsers.stream()
+                .filter(user -> RoleCode.PARTY_SECRETARY.equals(user.getRoleCode()))
+                .count();
+        if (deputyCount != 1 || stationmasterCount != 1 || partySecretaryCount != 1) {
+            throw new BizException("中层正职流程必须各选择1名副站长、站长、党委书记");
+        }
+    }
+
+    private List<UserAccount> resolveSickOverMonthCandidates(ApprovalRuleStep currentRuleStep) {
+        String candidateGroup = currentRuleStep == null ? null : currentRuleStep.getCandidateGroup();
+        if (CANDIDATE_GROUP_SUPERVISOR.equals(candidateGroup)) {
+            return findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER));
+        }
+        if (CANDIDATE_GROUP_STATIONMASTER.equals(candidateGroup)) {
+            return findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER));
+        }
+        return List.of();
     }
 
     private List<String> resolveStationmasterCandidateRoles(LeaveRequest request) {
@@ -918,13 +1270,16 @@ public class LeaveService {
         return switch (roleCode) {
             case RoleCode.DEPUTY_STATIONMASTER -> CANDIDATE_GROUP_SUPERVISOR;
             case RoleCode.STATIONMASTER -> CANDIDATE_GROUP_STATIONMASTER;
-            case RoleCode.UNIT_LEADER -> CANDIDATE_GROUP_UNIT_LEADER;
             case RoleCode.PARTY_SECRETARY -> CANDIDATE_GROUP_PARTY_AND_PRINCIPAL;
             default -> null;
         };
     }
 
     private SelectionScenario determineSelectionScenario(LeaveRequest request) {
+        if (APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(request.getApplicantType())
+                || POSITION_SECTION_LEVEL.equals(request.getPositionLevelCode())) {
+            return SelectionScenario.SECTION_LEVEL;
+        }
         LeaveType leaveType = requireLeaveType(request.getLeaveTypeId());
         String leaveScope = resolveLeaveScope(leaveType);
         BigDecimal leaveDays = request.getLeaveDays();
@@ -945,6 +1300,9 @@ public class LeaveService {
             if (leaveDays.compareTo(DAY_30) > 0) {
                 return SelectionScenario.PERSONAL_OVER_30;
             }
+            if (leaveDays.compareTo(DAY_5) > 0 && leaveDays.compareTo(DAY_10) <= 0) {
+                return SelectionScenario.PERSONAL_5_TO_10;
+            }
             if (leaveDays.compareTo(DAY_10) > 0) {
                 return SelectionScenario.PERSONAL_10_TO_30;
             }
@@ -957,6 +1315,12 @@ public class LeaveService {
             if (!pending.getApproverUserId().equals(operator.getId())) {
                 throw new BizException("当前账号无权处理该节点");
             }
+            if (isSelectedApproverNode(request, pending)) {
+                if (!pending.getApproverRoleCode().equals(operator.getRoleCode())) {
+                    throw new BizException("当前账号无权处理该节点");
+                }
+                return;
+            }
             requireApprovalPermission(operator, request, pending);
             return;
         }
@@ -967,6 +1331,11 @@ public class LeaveService {
             throw new BizException("当前账号只能处理本单位节点");
         }
         requireApprovalPermission(operator, request, pending);
+    }
+
+    private boolean isSelectedApproverNode(LeaveRequest request, LeaveApproval pending) {
+        ApprovalRuleStep step = requireRuleStep(request.getApprovalRuleId(), pending.getRuleStepId());
+        return APPROVER_SOURCE_SELECTED.equals(step.getApproverSource());
     }
 
     private void requireApprovalPermission(UserAccount operator, LeaveRequest request, LeaveApproval pending) {
@@ -987,10 +1356,12 @@ public class LeaveService {
             return true;
         }
         if (permission.getApplicantType() != null
-                && !permission.getApplicantType().equals(resolveRuleApplicantType(request.getApplicantType()))) {
+                && !permission.getApplicantType().equals(resolveRuleApplicantType(request.getApplicantType(), leaveScope))) {
             return false;
         }
-        if (permission.getPositionLevelCode() != null && !permission.getPositionLevelCode().equals(request.getPositionLevelCode())) {
+        if (permission.getPositionLevelCode() != null
+                && !permission.getPositionLevelCode().equals(
+                resolveRulePositionLevel(request.getApplicantType(), request.getPositionLevelCode(), leaveScope))) {
             return false;
         }
         if (permission.getLeaveScope() != null
@@ -1022,11 +1393,23 @@ public class LeaveService {
                 && request.getLeaveDays().compareTo(DAY_30) > 0;
     }
 
-    private String resolveRuleApplicantType(String applicantType) {
+    private String resolveRuleApplicantType(String applicantType, String leaveScope) {
+        if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
+                && (LEAVE_SCOPE_SICK.equals(leaveScope) || LEAVE_SCOPE_PERSONAL.equals(leaveScope))) {
+            return APPLICANT_TYPE_EMPLOYEE;
+        }
         if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType)) {
             return APPLICANT_TYPE_CADRE;
         }
         return applicantType;
+    }
+
+    private String resolveRulePositionLevel(String applicantType, String actualPositionLevel, String leaveScope) {
+        if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
+                && (LEAVE_SCOPE_SICK.equals(leaveScope) || LEAVE_SCOPE_PERSONAL.equals(leaveScope))) {
+            return POSITION_STAFF;
+        }
+        return resolvePositionLevel(applicantType, actualPositionLevel);
     }
 
     private void decideApproval(LeaveApproval approval, Long approverUserId, Boolean approved, String comment, String signatureUrl) {
@@ -1045,6 +1428,42 @@ public class LeaveService {
         String normalized = signatureUrl.trim();
         if (normalized.startsWith(LEGACY_FILE_HOST + FILE_URL_PREFIX)) {
             return normalized.replace(LEGACY_FILE_HOST, "");
+        }
+        return normalized;
+    }
+
+    private void ensureNoTemporarySignatureOverride(org.springframework.web.multipart.MultipartFile signatureFile,
+                                                    String submittedSignatureUrl,
+                                                    BatchSignaturePayload batchSignaturePayload,
+                                                    String configuredSignatureUrl) {
+        if ((signatureFile != null && !signatureFile.isEmpty()) || batchSignaturePayload != null) {
+            throw new BizException("电子签名只能由超级管理员预先上传，审批时不允许临时上传或覆盖");
+        }
+
+        String normalizedSubmittedUrl = normalizeSignatureUrl(submittedSignatureUrl);
+        if (normalizedSubmittedUrl == null) {
+            return;
+        }
+        if (sameSignatureUrl(normalizedSubmittedUrl, configuredSignatureUrl)) {
+            return;
+        }
+        throw new BizException("电子签名只能由超级管理员预先上传，审批时不允许临时上传或覆盖");
+    }
+
+    private boolean sameSignatureUrl(String first, String second) {
+        String normalizedFirst = canonicalizeSignatureUrl(first);
+        String normalizedSecond = canonicalizeSignatureUrl(second);
+        return normalizedFirst != null && normalizedFirst.equals(normalizedSecond);
+    }
+
+    private String canonicalizeSignatureUrl(String signatureUrl) {
+        String normalized = normalizeSignatureUrl(signatureUrl);
+        if (normalized == null) {
+            return null;
+        }
+        int filePrefixIndex = normalized.indexOf(FILE_URL_PREFIX);
+        if (filePrefixIndex >= 0) {
+            return normalized.substring(filePrefixIndex);
         }
         return normalized;
     }
@@ -1133,8 +1552,10 @@ public class LeaveService {
 
     private enum SelectionScenario {
         NONE,
+        SECTION_LEVEL,
         SICK_WITHIN_MONTH,
         SICK_OVER_MONTH,
+        PERSONAL_5_TO_10,
         PERSONAL_10_TO_30,
         PERSONAL_OVER_30
     }
@@ -1148,22 +1569,14 @@ public class LeaveService {
     }
 
     private UserAccount resolveApplicant(CreateLeaveRequestDto dto) {
-        String applicantName = dto.getApplicantName() == null ? null : dto.getApplicantName().trim();
-        if (applicantName != null && !applicantName.isBlank()) {
-            List<UserAccount> matchedUsers = userAccountMapper.findEnabledByEmpName(applicantName);
-            if (matchedUsers.size() == 1) {
-                return matchedUsers.get(0);
-            }
-            if (matchedUsers.size() > 1) {
-                throw new BizException("请假人姓名重复，请使用唯一姓名或调整人员档案: " + applicantName);
-            }
-        }
         return requireUser(dto.getApplicantId());
     }
 
     private String resolveApplicantNameSnapshot(String applicantType, UserAccount applicant, CreateLeaveRequestDto dto) {
         String inputName = dto.getApplicantName() == null ? null : dto.getApplicantName().trim();
-        if ((APPLICANT_TYPE_EMPLOYEE.equals(applicantType) || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType))
+        if ((APPLICANT_TYPE_EMPLOYEE.equals(applicantType)
+                || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
+                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType))
                 && inputName != null && !inputName.isBlank()) {
             return inputName;
         }
@@ -1194,8 +1607,8 @@ public class LeaveService {
         return request;
     }
 
-    private LeaveApproval requirePendingApproval(Long leaveId) {
-        LeaveApproval approval = leaveApprovalMapper.findFirstPending(leaveId);
+    private LeaveApproval requireCurrentPendingApproval(LeaveRequest request) {
+        LeaveApproval approval = leaveApprovalMapper.findPendingByStep(request.getId(), request.getCurrentStep());
         if (approval == null) {
             throw new BizException("当前请假单不存在待处理节点");
         }

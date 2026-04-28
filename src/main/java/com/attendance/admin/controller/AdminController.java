@@ -9,6 +9,7 @@ import com.attendance.admin.dto.SaveLeaveSignRequirementRequest;
 import com.attendance.admin.dto.SaveApprovalPermissionRequest;
 import com.attendance.admin.dto.UpdateEnabledRequest;
 import com.attendance.admin.dto.UpdateOrgUnitRequest;
+import com.attendance.admin.dto.UpdateUserSignatureRequest;
 import com.attendance.admin.dto.UpdateUserRequest;
 import com.attendance.admin.dto.UserSummaryResponse;
 import com.attendance.admin.model.ApprovalPermission;
@@ -84,6 +85,13 @@ public class AdminController {
     public ApiResponse<UserSummaryResponse> updateUser(@PathVariable Long userId,
                                                        @Valid @RequestBody UpdateUserRequest request) {
         return ApiResponse.success("用户更新成功", adminService.updateUser(userId, request));
+    }
+
+    @Operation(summary = "上传或更改审批人电子签名", description = "超级管理员为可审批账号上传签名文件，或直接保存已有签名地址。")
+    @PatchMapping("/users/{userId}/signature")
+    public ApiResponse<UserSummaryResponse> updateUserSignature(@PathVariable Long userId,
+                                                                @ModelAttribute UpdateUserSignatureRequest request) {
+        return ApiResponse.success("电子签名更新成功", adminService.updateUserSignature(userId, request));
     }
 
     @Operation(summary = "启停用用户")

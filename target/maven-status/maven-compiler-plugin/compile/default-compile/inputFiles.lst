@@ -9,6 +9,7 @@ C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendan
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\dto\UpdateEnabledRequest.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\dto\UpdateOrgUnitRequest.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\dto\UpdateUserRequest.java
+C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\dto\UpdateUserSignatureRequest.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\dto\UserSummaryResponse.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\mapper\ApprovalPermissionMapper.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\admin\mapper\LeaveSignRequirementMapper.java
@@ -45,6 +46,8 @@ C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendan
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\ApproveLeaveWithSignatureDto.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\BatchApproveLeaveDto.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\BatchApproveLeaveResponse.java
+C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\BatchLeavePdfRequest.java
+C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\BatchLeavePdfResponse.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\CancelLeaveRequestDto.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\CreateLeaveRequestDto.java
 C:\Users\Bond\Desktop\AttendanceSystem\attendance-sys\src\main\java\com\attendance\leave\dto\LeaveDetailResponse.java
