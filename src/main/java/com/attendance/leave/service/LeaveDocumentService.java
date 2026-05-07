@@ -517,9 +517,13 @@ public class LeaveDocumentService {
         ApprovalRecordResponse partySecretary = isGeneralCadre(detail)
                 ? null
                 : findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
+        ApprovalRecordResponse deputyStationmaster = findApprovalByRoleOrName(approvals, "DEPUTY_STATIONMASTER", "副站长");
+        boolean generalCadreSickWithDeputy = isGeneralCadre(detail) && isSickLeave(detail) && deputyStationmaster != null;
+        ApprovalRecordResponse topRight = generalCadreSickWithDeputy ? deputyStationmaster : hrSectionChief;
+        ApprovalRecordResponse bottomLeft = stationmaster;
         slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true));
-        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, hrSectionChief, 410, 454, 478, 467, 505, true));
-        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmaster, 176, 220, 244, 388, 426, true));
+        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, topRight, 410, 454, 478, 467, 505, true));
+        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, bottomLeft, 176, 220, 244, 388, 426, true));
         slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, partySecretary, 410, 454, 478, 388, 426, true));
         return slots;
     }
@@ -574,6 +578,10 @@ public class LeaveDocumentService {
 
     private boolean shouldPlaceUnitLeaderInStationmasterSlot(LeaveDetailResponse detail) {
         return isSickLeaveOver30Days(detail) || isPersonalLeaveOver10AndWithin30Days(detail);
+    }
+
+    private boolean isSickLeave(LeaveDetailResponse detail) {
+        return isLeaveType(detail, "病");
     }
 
     private boolean isSickLeaveOver30Days(LeaveDetailResponse detail) {

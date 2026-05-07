@@ -16,4 +16,7 @@ public class UpdateOrgUnitRequest {
 
     @NotNull(message = "启用状态不能为空")
     private Integer isEnabled;
+
+    @NotBlank(message = "组织名称不能为空")
+    public String orgName;
 }

@@ -104,7 +104,7 @@ public class AdminService {
     public OrgUnitResponse updateOrgUnit(Long orgUnitId, UpdateOrgUnitRequest request) {
         requireSystemAdmin();
         OrgUnit orgUnit = requireOrgUnit(orgUnitId);
-        orgUnit.setOrgCode(generateOrgCode(request.getOrgType()));
+        orgUnit.setOrgName(request.getOrgName());
         orgUnit.setOrgType(request.getOrgType());
         orgUnit.setSortNo(request.getSortNo());
         orgUnit.setIsEnabled(request.getIsEnabled());

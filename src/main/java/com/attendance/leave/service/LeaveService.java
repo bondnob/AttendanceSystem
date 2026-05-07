@@ -332,14 +332,18 @@ public class LeaveService {
                                                                        ApprovalRuleStep currentRuleStep,
                                                                        List<UserAccount> selectedUsers) {
         int targetCount = selectedUsers.size();
+        SelectionScenario scenario = determineSelectionScenario(request);
         List<ApprovalRuleStep> selectedSteps = requireRuleSteps(request.getApprovalRuleId()).stream()
                 .filter(step -> step.getStepNo() > currentRuleStep.getStepNo())
                 .filter(step -> ACTION_APPROVE.equals(step.getActionType()))
                 .filter(step -> APPROVER_SOURCE_SELECTED.equals(step.getApproverSource()))
-                .filter(step -> currentRuleStep.getCandidateGroup() == null
+                .filter(step -> SelectionScenario.SICK_OVER_MONTH.equals(scenario)
+                        || currentRuleStep.getCandidateGroup() == null
                         || currentRuleStep.getCandidateGroup().equals(step.getCandidateGroup()))
                 .collect(Collectors.toList());
-        if (SelectionScenario.SECTION_LEVEL.equals(determineSelectionScenario(request))) {
+        if (SelectionScenario.SECTION_LEVEL.equals(scenario)) {
+            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers);
+        } else if (SelectionScenario.SICK_OVER_MONTH.equals(scenario)) {
             selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers);
         }
         if (selectedSteps.size() < targetCount) {
@@ -1222,32 +1226,39 @@ public class LeaveService {
     }
 
     private void validateSelectedApproverRoles(SelectionScenario scenario, List<UserAccount> selectedUsers) {
-        if (!SelectionScenario.SECTION_LEVEL.equals(scenario)) {
+        if (SelectionScenario.SECTION_LEVEL.equals(scenario)) {
+            long deputyCount = selectedUsers.stream()
+                    .filter(user -> RoleCode.DEPUTY_STATIONMASTER.equals(user.getRoleCode()))
+                    .count();
+            long stationmasterCount = selectedUsers.stream()
+                    .filter(user -> RoleCode.STATIONMASTER.equals(user.getRoleCode()))
+                    .count();
+            long partySecretaryCount = selectedUsers.stream()
+                    .filter(user -> RoleCode.PARTY_SECRETARY.equals(user.getRoleCode()))
+                    .count();
+            if (deputyCount != 1 || stationmasterCount != 1 || partySecretaryCount != 1) {
+                throw new BizException("中层正职流程必须各选择1名副站长、站长、党委书记");
+            }
             return;
         }
-        long deputyCount = selectedUsers.stream()
-                .filter(user -> RoleCode.DEPUTY_STATIONMASTER.equals(user.getRoleCode()))
-                .count();
-        long stationmasterCount = selectedUsers.stream()
-                .filter(user -> RoleCode.STATIONMASTER.equals(user.getRoleCode()))
-                .count();
-        long partySecretaryCount = selectedUsers.stream()
-                .filter(user -> RoleCode.PARTY_SECRETARY.equals(user.getRoleCode()))
-                .count();
-        if (deputyCount != 1 || stationmasterCount != 1 || partySecretaryCount != 1) {
-            throw new BizException("中层正职流程必须各选择1名副站长、站长、党委书记");
+        if (SelectionScenario.SICK_OVER_MONTH.equals(scenario)) {
+            long deputyCount = selectedUsers.stream()
+                    .filter(user -> RoleCode.DEPUTY_STATIONMASTER.equals(user.getRoleCode()))
+                    .count();
+            long stationmasterCount = selectedUsers.stream()
+                    .filter(user -> RoleCode.STATIONMASTER.equals(user.getRoleCode()))
+                    .count();
+            if (deputyCount != 1 || stationmasterCount != 1) {
+                throw new BizException("病假超30天流程必须各选择1名副站长和站长");
+            }
         }
     }
 
     private List<UserAccount> resolveSickOverMonthCandidates(ApprovalRuleStep currentRuleStep) {
-        String candidateGroup = currentRuleStep == null ? null : currentRuleStep.getCandidateGroup();
-        if (CANDIDATE_GROUP_SUPERVISOR.equals(candidateGroup)) {
-            return findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER));
-        }
-        if (CANDIDATE_GROUP_STATIONMASTER.equals(candidateGroup)) {
-            return findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER));
-        }
-        return List.of();
+        List<UserAccount> candidates = new ArrayList<>();
+        candidates.addAll(findEnabledUsersByRoles(List.of(RoleCode.DEPUTY_STATIONMASTER)));
+        candidates.addAll(findEnabledUsersByRoles(List.of(RoleCode.STATIONMASTER)));
+        return candidates;
     }
 
     private List<String> resolveStationmasterCandidateRoles(LeaveRequest request) {
