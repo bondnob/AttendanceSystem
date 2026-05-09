@@ -17,6 +17,8 @@ import com.attendance.admin.model.LeaveSignRequirement;
 import com.attendance.admin.service.AdminService;
 import com.attendance.common.ApiResponse;
 import com.attendance.common.PageResponse;
+import com.attendance.leave.dto.LeaveListItemResponse;
+import com.attendance.leave.service.LeaveService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
+    private final LeaveService leaveService;
 
     @Operation(summary = "新增组织")
     @PostMapping("/org-units")
@@ -140,5 +143,16 @@ public class AdminController {
     public ApiResponse<Void> sendUserMessage(@Valid @RequestBody SendUserMessageRequest request) {
         adminService.sendUserMessage(request);
         return ApiResponse.success("信息提示发送成功", null);
+    }
+
+    @Operation(summary = "所有请假记录", description = "超级管理员查看所有请假记录列表，支持按状态、假别和申请人姓名筛选。")
+    @GetMapping("/leaves")
+    public ApiResponse<PageResponse<LeaveListItemResponse>> listAllLeaves(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long leaveTypeId,
+            @RequestParam(required = false) String applicantName,
+            @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return ApiResponse.success(leaveService.listAllLeaves(status, leaveTypeId, applicantName, pageNum, pageSize));
     }
 }

@@ -41,4 +41,7 @@ public class CreateLeaveRequestDto {
     private String reason;
 
     private String remark;
+
+    @NotNull(message = "申请时间不能为空")
+    private LocalDateTime submittedAt;
 }

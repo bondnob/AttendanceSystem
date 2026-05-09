@@ -11,7 +11,7 @@
  Target Server Version : 80044 (8.0.44)
  File Encoding         : 65001
 
- Date: 27/04/2026 10:37:06
+ Date: 08/05/2026 18:30:56
 */
 
 SET NAMES utf8mb4;
@@ -839,13 +839,12 @@ INSERT INTO `approval_rule_step` VALUES (32, 9, 5, 'APPROVE', 0, 'PARTY_AND_PRIN
 INSERT INTO `approval_rule_step` VALUES (33, 10, 1, 'APPROVE', 0, NULL, 'ORG_PRINCIPAL_APPROVE', '科室车间负责人审批', '科室车间负责人审批（电子签名）', 'APPLICANT_ORG', 'ORG_PRINCIPAL', '科室车间负责人', 1, '2026-04-17 19:20:19', '2026-04-17 19:20:19');
 INSERT INTO `approval_rule_step` VALUES (34, 11, 1, 'APPROVE', 0, NULL, 'ORG_PRINCIPAL_APPROVE', '科室车间负责人审批', '科室车间负责人审批（电子签名）', 'APPLICANT_ORG', 'ORG_PRINCIPAL', '科室车间负责人', 0, '2026-04-21 22:41:09', '2026-04-21 22:41:09');
 INSERT INTO `approval_rule_step` VALUES (35, 11, 2, 'APPROVE', 0, NULL, 'HR_APPROVE', '劳动人事科科长审批', '劳动人事科科长审批（电子签名）', 'HR_ORG', 'HR_SECTION_CHIEF', '劳动人事科科长', 1, '2026-04-21 22:41:09', '2026-04-21 22:41:09');
--- 步骤36已删除：选择站长步骤合并到步骤3（assignee_count改为2）
 INSERT INTO `approval_rule_step` VALUES (37, 12, 1, 'APPROVE', 0, NULL, 'ORG_PRINCIPAL_APPROVE', '科室车间负责人审批', '科室车间负责人审批（电子签名）', 'APPLICANT_ORG', 'ORG_PRINCIPAL', '科室车间负责人', 0, '2026-04-21 22:41:09', '2026-04-21 22:41:09');
 INSERT INTO `approval_rule_step` VALUES (38, 12, 2, 'APPROVE', 0, NULL, 'HR_APPROVE', '劳动人事科科长审批', '劳动人事科科长审批（电子签名）', 'HR_ORG', 'HR_SECTION_CHIEF', '劳动人事科科长', 1, '2026-04-21 22:41:09', '2026-04-21 22:41:09');
 INSERT INTO `approval_rule_step` VALUES (39, 12, 3, 'SELECT', 3, 'PARTY_AND_PRINCIPAL', 'SELECT_SECTION_LEVEL_LEADERS', '选择后续领导', '科室车间负责人选择副站长、站长、党委书记', 'APPLICANT_ORG', 'ORG_PRINCIPAL', '科室车间负责人', 0, '2026-04-21 22:41:09', '2026-04-27 10:00:14');
 INSERT INTO `approval_rule_step` VALUES (40, 12, 4, 'APPROVE', 0, 'PARTY_AND_PRINCIPAL', 'SELECTED_DEPUTY_STATIONMASTER_APPROVE', '副站长审批', '副站长审批（电子签名）', 'SELECTED', 'DEPUTY_STATIONMASTER', '副站长', 0, '2026-04-21 22:41:09', '2026-04-27 10:00:14');
 INSERT INTO `approval_rule_step` VALUES (41, 12, 5, 'APPROVE', 0, 'PARTY_AND_PRINCIPAL', 'SELECTED_STATIONMASTER_APPROVE', '站长审批', '站长审批（电子签名）', 'SELECTED', 'STATIONMASTER', '站长', 1, '2026-04-21 22:41:09', '2026-04-27 10:00:14');
-INSERT INTO `approval_rule_step` VALUES (42, 4, 6, 'APPROVE', 0, 'STATIONMASTER', 'SELECTED_STATIONMASTER_APPROVE', '站长审批', '站长审批（电子签名）', 'SELECTED', 'STATIONMASTER', '站长', 0, '2026-04-26 20:37:07', '2026-04-26 20:37:07');
+INSERT INTO `approval_rule_step` VALUES (42, 4, 5, 'APPROVE', 0, 'STATIONMASTER', 'SELECTED_STATIONMASTER_APPROVE', '站长审批', '站长审批（电子签名）', 'SELECTED', 'STATIONMASTER', '站长', 0, '2026-04-26 20:37:07', '2026-05-07 17:10:17');
 INSERT INTO `approval_rule_step` VALUES (43, 9, 6, 'APPROVE', 0, 'PARTY_AND_PRINCIPAL', 'SELECTED_PARTY_SECRETARY_APPROVE', '党委书记审批', '党委书记审批（电子签名）', 'SELECTED', 'PARTY_SECRETARY', '党委书记', 1, '2026-04-27 10:00:14', '2026-04-27 10:00:14');
 INSERT INTO `approval_rule_step` VALUES (44, 12, 6, 'APPROVE', 0, 'PARTY_AND_PRINCIPAL', 'SELECTED_PARTY_SECRETARY_APPROVE', '党委书记审批', '党委书记审批（电子签名）', 'SELECTED', 'PARTY_SECRETARY', '党委书记', 1, '2026-04-27 10:00:14', '2026-04-27 10:00:14');
 
@@ -875,7 +874,7 @@ CREATE TABLE `leave_approval`  (
   CONSTRAINT `fk_leave_approval_approver_user` FOREIGN KEY (`approver_user_id`) REFERENCES `user_account` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_leave_approval_leave_request` FOREIGN KEY (`leave_request_id`) REFERENCES `leave_request` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_leave_approval_rule_step` FOREIGN KEY (`rule_step_id`) REFERENCES `approval_rule_step` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 17 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '请假审批明细表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 52 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '请假审批明细表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of leave_approval
@@ -886,6 +885,23 @@ INSERT INTO `leave_approval` VALUES (13, 3, 30, 3, 'SELECT', '科室车间负责
 INSERT INTO `leave_approval` VALUES (14, 3, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
 INSERT INTO `leave_approval` VALUES (15, 3, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
 INSERT INTO `leave_approval` VALUES (16, 3, 43, 6, 'APPROVE', '党委书记审批（电子签名）', 'PARTY_SECRETARY', 60, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_approval` VALUES (17, 4, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 16:58:21', '2026-05-07 16:56:57', '2026-05-07 16:58:20');
+INSERT INTO `leave_approval` VALUES (18, 4, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, '2026-05-07 16:58:31', '2026-05-07 16:56:57', '2026-05-07 16:58:30');
+INSERT INTO `leave_approval` VALUES (19, 4, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 16:59:10', '2026-05-07 16:56:57', '2026-05-07 16:59:09');
+INSERT INTO `leave_approval` VALUES (20, 4, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, '2026-05-07 16:56:57', '2026-05-07 17:14:47');
+INSERT INTO `leave_approval` VALUES (21, 5, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 17:04:45', '2026-05-07 17:03:52', '2026-05-07 17:04:45');
+INSERT INTO `leave_approval` VALUES (22, 5, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '147', NULL, '2026-05-07 17:05:12', '2026-05-07 17:03:52', '2026-05-07 17:05:12');
+INSERT INTO `leave_approval` VALUES (23, 5, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 17:12:00', '2026-05-07 17:03:52', '2026-05-07 17:12:00');
+INSERT INTO `leave_approval` VALUES (24, 5, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_59.png', '2026-05-07 17:16:40', '2026-05-07 17:03:52', '2026-05-07 17:16:40');
+INSERT INTO `leave_approval` VALUES (29, 6, 5, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 17:17:33', '2026-05-07 17:17:11', '2026-05-07 17:17:32');
+INSERT INTO `leave_approval` VALUES (30, 6, 7, 3, 'SELECT', '科室车间负责人选择主管领导', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, '2026-05-07 17:17:42', '2026-05-07 17:17:11', '2026-05-07 17:17:42');
+INSERT INTO `leave_approval` VALUES (31, 6, 8, 4, 'APPROVE', '主管领导审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 17:18:01', '2026-05-07 17:17:11', '2026-05-07 17:18:01');
+INSERT INTO `leave_approval` VALUES (46, 9, 28, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 19, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_19.png', '2026-05-08 14:41:50', '2026-05-07 22:22:41', '2026-05-08 14:41:50');
+INSERT INTO `leave_approval` VALUES (47, 9, 29, 2, 'APPROVE', '劳动人事科科长审批（电子签名）', 'HR_SECTION_CHIEF', 7, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_7.png', '2026-05-08 14:43:11', '2026-05-07 22:22:41', '2026-05-08 14:43:11');
+INSERT INTO `leave_approval` VALUES (48, 9, 30, 3, 'SELECT', '科室车间负责人选择副站长、站长、党委书记', 'ORG_PRINCIPAL', 19, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (49, 9, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (50, 9, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (51, 9, 43, 6, 'APPROVE', '党委书记审批（电子签名）', 'PARTY_SECRETARY', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
 
 -- ----------------------------
 -- Table structure for leave_request
@@ -915,12 +931,16 @@ CREATE TABLE `leave_request`  (
   `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT' COMMENT '状态',
   `current_step` int NOT NULL DEFAULT 0 COMMENT '当前审批步骤',
   `current_action_type` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '当前节点类型',
+  `current_approver_id` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '当前审批人/选择人ID',
   `submitted_by` bigint NULL DEFAULT NULL COMMENT '提报人账号ID',
   `submitted_at` datetime NULL DEFAULT NULL COMMENT '提交时间',
   `final_approved_at` datetime NULL DEFAULT NULL COMMENT '最终通过时间',
   `created_by` bigint NULL DEFAULT NULL COMMENT '创建人账号ID',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `applicant_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '请假人手写签名地址',
+  `team_leader_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班组长手写签名地址',
+  `applicant_date_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '请假人手写日期地址',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_leave_request_request_no`(`request_no` ASC) USING BTREE,
   INDEX `idx_leave_request_applicant_id`(`applicant_id` ASC) USING BTREE,
@@ -936,12 +956,16 @@ CREATE TABLE `leave_request`  (
   CONSTRAINT `fk_leave_request_leave_type` FOREIGN KEY (`leave_type_id`) REFERENCES `leave_type` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_leave_request_org_unit` FOREIGN KEY (`org_unit_id`) REFERENCES `org_unit` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `fk_leave_request_submitted_by` FOREIGN KEY (`submitted_by`) REFERENCES `user_account` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 4 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '请假申请主表' ROW_FORMAT = DYNAMIC;
+) ENGINE = InnoDB AUTO_INCREMENT = 10 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '请假申请主表' ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of leave_request
 -- ----------------------------
-INSERT INTO `leave_request` VALUES (3, 'LR202604271009554F17AA', 18, 10, 2, 9, '噜噜', 'SECTION_LEVEL_CADRE', 'SECTION_LEVEL', '1', '班组长', '2026-04-27', '2026-04-30', '2026-04-27 00:00:00', '2026-04-30 00:00:00', 3.00, NULL, 0, '123', NULL, 'APPROVING', 4, 'APPROVE', 18, '2026-04-27 10:09:55', NULL, 18, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_request` VALUES (3, 'LR202604271009554F17AA', 18, 10, 2, 9, '噜噜', 'SECTION_LEVEL_CADRE', 'SECTION_LEVEL', '1', '班组长', '2026-04-27', '2026-04-30', '2026-04-27 00:00:00', '2026-04-30 00:00:00', 3.00, NULL, 0, '123', NULL, 'APPROVING', 4, 'APPROVE', '58', 18, '2026-04-27 10:09:55', NULL, 18, '2026-04-27 10:09:55', '2026-04-27 10:33:48', NULL, NULL, NULL);
+INSERT INTO `leave_request` VALUES (4, 'LR2026050716565778624C', 2, 2, 3, 4, '噜噜', 'GENERAL_CADRE', 'GENERAL_CADRE', '2', '3', '2026-05-07', '2026-05-08', '2026-05-07 00:00:00', '2026-05-08 00:00:00', 32.00, 21.75, 1, '1', NULL, 'APPROVING', 5, 'APPROVE', '59', 2, '2026-05-07 16:56:57', NULL, 2, '2026-05-07 16:56:57', '2026-05-07 17:15:43', NULL, NULL, NULL);
+INSERT INTO `leave_request` VALUES (5, 'LR20260507170352425E09', 2, 2, 3, 4, '1', 'GENERAL_CADRE', 'GENERAL_CADRE', '2', '2', '2026-05-07', '2026-05-08', '2026-05-07 00:00:00', '2026-05-08 00:00:00', 32.00, 21.75, 1, '123\n', NULL, 'APPROVED', 99, NULL, NULL, 2, '2026-05-07 17:03:53', '2026-05-07 17:16:40', 2, '2026-05-07 17:03:52', '2026-05-07 17:16:40', NULL, NULL, NULL);
+INSERT INTO `leave_request` VALUES (6, 'LR202605071717118E3A15', 2, 2, 3, 3, '噜噜', 'GENERAL_CADRE', 'GENERAL_CADRE', '2', '3', '2026-05-07', '2026-05-13', '2026-05-07 00:00:00', '2026-05-13 00:00:00', 28.00, 21.75, 0, '0', NULL, 'APPROVED', 99, NULL, NULL, 2, '2026-05-07 17:17:11', '2026-05-07 17:18:01', 2, '2026-05-07 17:13:33', '2026-05-07 17:18:01', NULL, NULL, NULL);
+INSERT INTO `leave_request` VALUES (9, 'LR2026050722224146B60C', 18, 10, 7, 9, '1', 'SECTION_LEVEL_CADRE', 'SECTION_LEVEL', '1', '1', '2026-05-07', '2026-05-08', '2026-05-07 00:00:00', '2026-05-08 00:00:00', 32.00, 15.00, 1, '1', NULL, 'APPROVING', 3, 'SELECT', '19', 18, '2026-05-08 22:22:41', NULL, 18, '2026-05-07 22:22:02', '2026-05-08 14:43:11', NULL, NULL, NULL);
 
 -- ----------------------------
 -- Table structure for leave_sign_requirement
@@ -1096,7 +1120,7 @@ CREATE TABLE `user_account`  (
 -- ----------------------------
 INSERT INTO `user_account` VALUES (1, 'sys_admin', '123456', 'SYSTEM_ADMIN', '超级管理员', '系统超级管理员', NULL, NULL, NULL, 'CADRE', 'UNIT_PRINCIPAL', NULL, 1, 'ALL', 'ALL', 1, NULL, '2026-04-17 11:44:34', '2026-04-19 09:41:51', NULL);
 INSERT INTO `user_account` VALUES (2, 'D01_admin', '123456', 'ATTENDANCE_ADMIN', '考勤管理员', '办公室（党委办公室）考勤管理员', NULL, NULL, NULL, 'EMPLOYEE', 'STAFF', NULL, 2, 'ORG', 'NONE', 1, NULL, '2026-04-17 11:44:34', '2026-04-17 23:33:07', NULL);
-INSERT INTO `user_account` VALUES (3, 'D01_principal', '123456', 'ORG_PRINCIPAL', '科室车间负责人', '办公室（党委办公室）主任', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 2, 'ORG', 'ORG', 1, NULL, '2026-04-17 11:44:34', '2026-04-17 23:33:07', NULL);
+INSERT INTO `user_account` VALUES (3, 'D01_principal', '123456', 'ORG_PRINCIPAL', '科室车间负责人', '办公室（党委办公室）主任', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 2, 'ORG', 'ORG', 1, NULL, '2026-04-17 11:44:34', '2026-05-07 16:58:00', '/files/user-signatures/user_signature_user_3.png');
 INSERT INTO `user_account` VALUES (4, 'D02_admin', '123456', 'ATTENDANCE_ADMIN', '考勤管理员', '党群工作科（融媒体工作室）考勤管理员', NULL, NULL, NULL, 'EMPLOYEE', 'STAFF', NULL, 3, 'ORG', 'NONE', 1, NULL, '2026-04-17 11:44:34', '2026-04-17 23:33:07', NULL);
 INSERT INTO `user_account` VALUES (5, 'D02_principal', '123456', 'ORG_PRINCIPAL', '科室车间负责人', '党群工作科（融媒体工作室）科长', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 3, 'ORG', 'ORG', 1, NULL, '2026-04-17 11:44:34', '2026-04-17 23:33:07', NULL);
 INSERT INTO `user_account` VALUES (6, 'D03_admin', '123456', 'ATTENDANCE_ADMIN', '考勤管理员', '劳动人事科（党委组织科）考勤管理员', NULL, NULL, NULL, 'EMPLOYEE', 'STAFF', NULL, 4, 'ORG', 'NONE', 1, NULL, '2026-04-17 11:44:34', '2026-04-17 23:33:07', NULL);

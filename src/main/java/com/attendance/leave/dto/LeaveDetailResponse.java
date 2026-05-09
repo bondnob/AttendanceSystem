@@ -35,6 +35,9 @@ public class LeaveDetailResponse {
     private Long submittedBy;
     private LocalDateTime submittedAt;
     private LocalDateTime finalApprovedAt;
+    private String applicantSignatureUrl;
+    private String applicantDateSignatureUrl;
+    private String teamLeaderSignatureUrl;
     private String pdfUrl;
     private List<ApprovalRecordResponse> approvals;
 }

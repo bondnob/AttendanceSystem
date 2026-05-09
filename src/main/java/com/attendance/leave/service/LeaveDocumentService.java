@@ -46,6 +46,7 @@ public class LeaveDocumentService {
 
     private static final String APPLICANT_TYPE_EMPLOYEE = "EMPLOYEE";
     private static final String APPLICANT_TYPE_GENERAL_CADRE = "GENERAL_CADRE";
+    private static final String POSITION_LEVEL_SECTION = "SECTION_LEVEL";
     private static final String HR_ORG_CODE = "D04";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
@@ -151,8 +152,8 @@ public class LeaveDocumentService {
         writeCenteredText(canvas, font, 10.5f, formatDays(detail.getLeaveDays()), 402, 471, 632);
         writeCenteredText(canvas, font, 10.5f, safe(detail.getRemark()), 471, 528, 632);
         writeMultilineText(canvas, font, 11, safe(detail.getReason()), 128, 611, 390, 15);
-        writeText(canvas, font, 11, safe(detail.getApplicantName()), 356, 554);
-        writeDateSplit(canvas, font, detail.getSubmittedAt(), 410, 454, 478, 554);
+        // 请假人：签名用手写图片，日期用申请时间
+        drawApplicantSignature(canvas, font, detail, 300, 570);
 
         List<ApprovalSlot> slots = resolveApprovalSlots(detail);
         for (ApprovalSlot slot : slots) {
@@ -170,13 +171,29 @@ public class LeaveDocumentService {
         writeCenteredText(canvas, font, 10.5f, formatDays(detail.getLeaveDays()), 402, 471, 632);
         writeCenteredText(canvas, font, 10.5f, safe(detail.getRemark()), 471, 528, 632);
         writeMultilineText(canvas, font, 11, safe(detail.getReason()), 128, 611, 390, 15);
-        writeText(canvas, font, 11, safe(detail.getApplicantName()), 356, 554);
-        writeDateSplit(canvas, font, detail.getSubmittedAt(), 410, 454, 478, 554);
+        // 请假人：签名用手写图片，日期用申请时间
+        drawApplicantSignature(canvas, font, detail, 300, 570);
 
         List<ApprovalSlot> slots = resolveApprovalSlots(detail);
         for (ApprovalSlot slot : slots) {
             writeApprovalSlot(canvas, font, slot);
         }
+    }
+
+    private void drawApplicantSignature(PdfContentByte canvas, BaseFont font, LeaveDetailResponse detail,
+                                         float x, float y) throws IOException, DocumentException {
+        Image signature = loadSignatureImage(detail.getApplicantSignatureUrl());
+        if (signature != null) {
+            signature.scaleAbsolute(SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
+            signature.setAbsolutePosition(x, y - ((SIGNATURE_HEIGHT - DECISION_FONT_SIZE) / 2f) + SIGNATURE_Y_OFFSET);
+            PdfGState gState = new PdfGState();
+            gState.setFillOpacity(1f);
+            canvas.saveState();
+            canvas.setGState(gState);
+            canvas.addImage(signature);
+            canvas.restoreState();
+        }
+        writeDateSplit(canvas, font, detail.getSubmittedAt(), 405, 450, 475, y - 17);
     }
 
     private void writeApprovalSlot(PdfContentByte canvas, BaseFont font, ApprovalSlot slot) throws IOException, DocumentException {
@@ -186,9 +203,26 @@ public class LeaveDocumentService {
         if (slot.contentDate() != null) {
             writeDateSplit(canvas, font, slot.contentDate(), slot.dateYearX(), slot.dateMonthX(), slot.dateDayX(), slot.dateY());
         }
+        // 手写签名图片（班组长等）
+        if (slot.handwrittenSignatureUrl() != null && !slot.handwrittenSignatureUrl().isBlank()) {
+            Image handwrittenSig = loadSignatureImage(slot.handwrittenSignatureUrl());
+            if (handwrittenSig != null) {
+                handwrittenSig.scaleAbsolute(SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
+                float signatureX = slot.left() + SIGNATURE_X_OFFSET;
+                float signatureY = slot.decisionY() - ((SIGNATURE_HEIGHT - DECISION_FONT_SIZE) / 2f) + SIGNATURE_Y_OFFSET;
+                handwrittenSig.setAbsolutePosition(signatureX, signatureY);
+                PdfGState gState = new PdfGState();
+                gState.setFillOpacity(1f);
+                canvas.saveState();
+                canvas.setGState(gState);
+                canvas.addImage(handwrittenSig);
+                canvas.restoreState();
+            }
+        }
         if (slot.approval() == null) {
             return;
         }
+        // 审批人电子签名
         Image signature = slot.showSignature() ? loadSignatureImage(slot.approval().getSignatureUrl()) : null;
         if (signature != null) {
             signature.scaleAbsolute(SIGNATURE_WIDTH, SIGNATURE_HEIGHT);
@@ -493,18 +527,19 @@ public class LeaveDocumentService {
             ApprovalRecordResponse deputyStationmaster = findApprovalByRole(approvals, "DEPUTY_STATIONMASTER");
             ApprovalRecordResponse orgPrincipal = findApprovalByRole(approvals, "ORG_PRINCIPAL");
             if (isPersonalLeaveOver30Days(detail)) {
-                slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true));
-                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505, true));
+                slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true, null));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505, true, null));
             } else {
-                slots.add(new ApprovalSlot(67, 541, 295, 463, safe(detail.getTeamLeaderSnapshot()), detail.getSubmittedAt(), null, 176, 220, 244, 467, 0, false));
-                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true));
+                // 班组长：姓名用手写签名图片，日期保持电子打印
+                slots.add(new ApprovalSlot(67, 541, 295, 463, "", detail.getSubmittedAt(), null, 176, 220, 244, 467, 505, false, detail.getTeamLeaderSignatureUrl()));
+                slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true, null));
             }
             if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
-                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true));
-                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426, true));
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true, null));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426, true, null));
             } else {
-                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true));
-                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findLastLeaderApproval(approvals), 410, 454, 478, 388, 426, true));
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true, null));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findLastLeaderApproval(approvals), 410, 454, 478, 388, 426, true, null));
             }
             return slots;
         }
@@ -519,18 +554,29 @@ public class LeaveDocumentService {
                 : findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
         ApprovalRecordResponse deputyStationmaster = findApprovalByRoleOrName(approvals, "DEPUTY_STATIONMASTER", "副站长");
         boolean generalCadreSickWithDeputy = isGeneralCadre(detail) && isSickLeave(detail) && deputyStationmaster != null;
-        ApprovalRecordResponse topRight = generalCadreSickWithDeputy ? deputyStationmaster : hrSectionChief;
+        ApprovalRecordResponse topRight;
+        if (generalCadreSickWithDeputy) {
+            topRight = deputyStationmaster;
+        } else if (isSectionLevel(detail)) {
+            topRight = deputyStationmaster != null ? deputyStationmaster : hrSectionChief;
+        } else {
+            topRight = hrSectionChief;
+        }
         ApprovalRecordResponse bottomLeft = stationmaster;
-        slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true));
-        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, topRight, 410, 454, 478, 467, 505, true));
-        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, bottomLeft, 176, 220, 244, 388, 426, true));
-        slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, partySecretary, 410, 454, 478, 388, 426, true));
+        slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true, null));
+        slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, topRight, 410, 454, 478, 467, 505, true, null));
+        slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, bottomLeft, 176, 220, 244, 388, 426, true, null));
+        slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, partySecretary, 410, 454, 478, 388, 426, true, null));
         return slots;
     }
 
     private boolean isGeneralCadre(LeaveDetailResponse detail) {
         return APPLICANT_TYPE_GENERAL_CADRE.equals(detail.getApplicantType())
                 || APPLICANT_TYPE_GENERAL_CADRE.equals(detail.getPositionLevelCode());
+    }
+
+    private boolean isSectionLevel(LeaveDetailResponse detail) {
+        return POSITION_LEVEL_SECTION.equals(detail.getPositionLevelCode());
     }
 
     private ApprovalRecordResponse resolveCadreTopLeftApproval(LeaveDetailResponse detail,
@@ -640,7 +686,7 @@ public class LeaveDocumentService {
     private record ApprovalSlot(float left, float top, float right, float bottom,
                                 String content, LocalDateTime contentDate, ApprovalRecordResponse approval,
                                 float dateYearX, float dateMonthX, float dateDayX, float dateY,
-                                float decisionY, boolean showSignature) {
+                                float decisionY, boolean showSignature, String handwrittenSignatureUrl) {
         float width() {
             return right - left - 20;
         }

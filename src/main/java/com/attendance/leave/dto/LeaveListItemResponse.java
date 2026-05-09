@@ -30,4 +30,7 @@ public class LeaveListItemResponse {
     private LocalDateTime submittedAt;
     private String jobTitleSnapshot;
     private List<String> approvedRoles;
+    private String currentApproverId;
+    private String applicantSignatureUrl;
+    private String teamLeaderSignatureUrl;
 }

@@ -130,15 +130,22 @@ public class AdminService {
             throw new BizException("账号已存在");
         }
         user.setUsername(username);
-        user.setRoleCode(request.getRoleCode());
         user.setEmpName(request.getEmpName());
         user.setApplicantType(request.getApplicantType());
         user.setLeaderGroupCode(request.getLeaderGroupCode());
         user.setOrgUnitId(request.getOrgUnitId());
-        user.setDataScope(request.getDataScope());
-        user.setApprovalScope(request.getApprovalScope());
-        user.setSignatureUrl(request.getSignatureUrl());
-        user.setIsEnabled(request.getIsEnabled());
+        if (request.getDataScope() != null) {
+            user.setDataScope(request.getDataScope());
+        }
+        if (request.getApprovalScope() != null) {
+            user.setApprovalScope(request.getApprovalScope());
+        }
+        if (request.getSignatureUrl() != null) {
+            user.setSignatureUrl(request.getSignatureUrl());
+        }
+        if (request.getIsEnabled() != null) {
+            user.setIsEnabled(request.getIsEnabled());
+        }
         userAccountMapper.update(user);
         return toUserSummary(user);
     }

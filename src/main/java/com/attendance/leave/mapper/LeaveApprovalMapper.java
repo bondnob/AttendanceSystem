@@ -159,4 +159,13 @@ public interface LeaveApprovalMapper {
             WHERE leave_request_id = #{leaveRequestId}
             """)
     int deleteByLeaveRequestId(@Param("leaveRequestId") Long leaveRequestId);
+
+    @Delete("""
+            DELETE FROM leave_approval
+            WHERE leave_request_id = #{leaveRequestId}
+              AND step_no > #{stepNo}
+              AND approval_status = 'PENDING'
+            """)
+    int deletePendingAfterStep(@Param("leaveRequestId") Long leaveRequestId,
+                               @Param("stepNo") Integer stepNo);
 }

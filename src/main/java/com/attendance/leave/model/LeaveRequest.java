@@ -29,9 +29,13 @@ public class LeaveRequest {
     private String status;
     private Integer currentStep;
     private String currentActionType;
+    private String currentApproverId;
     private Long submittedBy;
     private LocalDateTime submittedAt;
     private LocalDateTime finalApprovedAt;
+    private String applicantSignatureUrl;
+    private String applicantDateSignatureUrl;
+    private String teamLeaderSignatureUrl;
     private Long createdBy;
     private java.math.BigDecimal allowedDays;
     private Integer exceedsOneMonth;

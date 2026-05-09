@@ -3,6 +3,7 @@ package com.attendance.leave.mapper;
 import com.attendance.auth.dto.DashboardLeaveTypeCountResponse;
 import com.attendance.leave.enums.LeaveRequestStatus;
 import com.attendance.leave.model.LeaveRequest;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
@@ -19,11 +20,11 @@ public interface LeaveRequestMapper {
             INSERT INTO leave_request
             (request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_name_snapshot, applicant_type, position_level_code,
              job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days, allowed_days, exceeds_one_month,
-             reason, remark, status, current_step, current_action_type, submitted_by, submitted_at, created_by)
+             reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by)
             VALUES
             (#{requestNo}, #{applicantId}, #{orgUnitId}, #{leaveTypeId}, #{approvalRuleId}, #{applicantNameSnapshot}, #{applicantType}, #{positionLevelCode},
              #{jobTitleSnapshot}, #{teamLeaderSnapshot}, #{startDate}, #{endDate}, #{startTime}, #{endTime}, #{leaveDays}, #{allowedDays}, #{exceedsOneMonth},
-             #{reason}, #{remark}, #{status}, #{currentStep}, #{currentActionType}, #{submittedBy}, #{submittedAt}, #{createdBy})
+             #{reason}, #{remark}, #{status}, #{currentStep}, #{currentActionType}, #{currentApproverId}, #{submittedBy}, #{submittedAt}, #{applicantSignatureUrl}, #{applicantDateSignatureUrl}, #{teamLeaderSignatureUrl}, #{createdBy})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LeaveRequest request);
@@ -31,8 +32,8 @@ public interface LeaveRequestMapper {
     @Select("""
             SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,
                    applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,
-                   allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,
-                   final_approved_at, created_by, created_at, updated_at
+                   allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,
+                   final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at
             FROM leave_request
             WHERE id = #{id}
             """)
@@ -41,8 +42,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
-            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
-            "       final_approved_at, created_by, created_at, updated_at",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
             "FROM leave_request",
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
@@ -58,8 +59,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
-            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
-            "       final_approved_at, created_by, created_at, updated_at",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
             "FROM leave_request",
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
@@ -123,8 +124,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT DISTINCT lr.id, lr.request_no, lr.applicant_id, lr.org_unit_id, lr.leave_type_id, lr.approval_rule_id, lr.applicant_type,",
             "       lr.applicant_name_snapshot, lr.position_level_code, lr.job_title_snapshot, lr.team_leader_snapshot, lr.start_date, lr.end_date, lr.start_time, lr.end_time, lr.leave_days,",
-            "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.submitted_by, lr.submitted_at,",
-            "       lr.final_approved_at, lr.created_by, lr.created_at, lr.updated_at",
+            "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.current_approver_id, lr.submitted_by, lr.submitted_at,",
+            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.created_by, lr.created_at, lr.updated_at",
             "FROM leave_request lr",
             "JOIN leave_approval la ON la.leave_request_id = lr.id",
             "WHERE la.approval_status = 'PENDING'",
@@ -178,8 +179,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT DISTINCT lr.id, lr.request_no, lr.applicant_id, lr.org_unit_id, lr.leave_type_id, lr.approval_rule_id, lr.applicant_type,",
             "       lr.applicant_name_snapshot, lr.position_level_code, lr.job_title_snapshot, lr.team_leader_snapshot, lr.start_date, lr.end_date, lr.start_time, lr.end_time, lr.leave_days,",
-            "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.submitted_by, lr.submitted_at,",
-            "       lr.final_approved_at, lr.created_by, lr.created_at, lr.updated_at",
+            "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.current_approver_id, lr.submitted_by, lr.submitted_at,",
+            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.created_by, lr.created_at, lr.updated_at",
             "FROM leave_request lr",
             "WHERE EXISTS (",
             "  SELECT 1",
@@ -273,8 +274,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
-            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
-            "       final_approved_at, created_by, created_at, updated_at",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
             "FROM leave_request",
             "WHERE applicant_name_snapshot = #{applicantNameSnapshot}",
             "  AND leave_type_id = #{leaveTypeId}",
@@ -298,11 +299,44 @@ public interface LeaveRequestMapper {
             SET status = #{status},
                 current_step = #{currentStep},
                 current_action_type = #{currentActionType},
+                current_approver_id = #{currentApproverId},
                 final_approved_at = #{finalApprovedAt},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
             """)
     int updateApprovalState(LeaveRequest request);
+
+    @Update("""
+            UPDATE leave_request
+            SET applicant_signature_url = #{applicantSignatureUrl},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateApplicantSignatureUrl(@Param("id") Long id, @Param("applicantSignatureUrl") String applicantSignatureUrl);
+
+    @Update("""
+            UPDATE leave_request
+            SET applicant_date_signature_url = #{applicantDateSignatureUrl},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateApplicantDateSignatureUrl(@Param("id") Long id, @Param("applicantDateSignatureUrl") String applicantDateSignatureUrl);
+
+    @Update("""
+            UPDATE leave_request
+            SET team_leader_signature_url = #{teamLeaderSignatureUrl},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateTeamLeaderSignatureUrl(@Param("id") Long id, @Param("teamLeaderSignatureUrl") String teamLeaderSignatureUrl);
+
+    @Update("""
+            UPDATE leave_request
+            SET submitted_at = #{submittedAt},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateSubmittedAt(@Param("id") Long id, @Param("submittedAt") LocalDateTime submittedAt);
 
     @Update("""
             UPDATE leave_request
@@ -328,8 +362,12 @@ public interface LeaveRequestMapper {
                 status = #{status},
                 current_step = #{currentStep},
                 current_action_type = #{currentActionType},
+                current_approver_id = #{currentApproverId},
                 submitted_at = #{submittedAt},
                 final_approved_at = #{finalApprovedAt},
+                applicant_signature_url = #{applicantSignatureUrl},
+                applicant_date_signature_url = #{applicantDateSignatureUrl},
+                team_leader_signature_url = #{teamLeaderSignatureUrl},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
             """)
@@ -344,8 +382,8 @@ public interface LeaveRequestMapper {
     @Select({"<script>",
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
-            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, submitted_by, submitted_at,",
-            "       final_approved_at, created_by, created_at, updated_at",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
             "FROM leave_request",
             "WHERE org_unit_id = #{orgUnitId}",
             "  AND status = 'APPROVED'",
@@ -357,4 +395,37 @@ public interface LeaveRequestMapper {
     List<LeaveRequest> findApprovedByDateRange(@Param("orgUnitId") Long orgUnitId,
                                                @Param("startDate") java.time.LocalDate startDate,
                                                @Param("endDate") java.time.LocalDate endDate);
+
+    @Select({"<script>",
+            "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
+            "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
+            "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "FROM leave_request",
+            "<where>",
+            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "  <if test='leaveTypeId != null'> AND leave_type_id = #{leaveTypeId}</if>",
+            "  <if test='applicantName != null and applicantName != \"\"'> AND applicant_name_snapshot LIKE CONCAT('%', #{applicantName}, '%')</if>",
+            "</where>",
+            "ORDER BY id DESC",
+            "LIMIT #{offset}, #{pageSize}",
+            "</script>"})
+    List<LeaveRequest> findAllPage(@Param("status") String status,
+                                   @Param("leaveTypeId") Long leaveTypeId,
+                                   @Param("applicantName") String applicantName,
+                                   @Param("offset") Integer offset,
+                                   @Param("pageSize") Integer pageSize);
+
+    @Select({"<script>",
+            "SELECT COUNT(1)",
+            "FROM leave_request",
+            "<where>",
+            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "  <if test='leaveTypeId != null'> AND leave_type_id = #{leaveTypeId}</if>",
+            "  <if test='applicantName != null and applicantName != \"\"'> AND applicant_name_snapshot LIKE CONCAT('%', #{applicantName}, '%')</if>",
+            "</where>",
+            "</script>"})
+    Long countAll(@Param("status") String status,
+                  @Param("leaveTypeId") Long leaveTypeId,
+                  @Param("applicantName") String applicantName);
 }

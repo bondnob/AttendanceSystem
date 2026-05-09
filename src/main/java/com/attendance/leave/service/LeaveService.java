@@ -17,6 +17,7 @@ import com.attendance.leave.dto.BatchLeavePdfRequest;
 import com.attendance.leave.dto.BatchLeavePdfResponse;
 import com.attendance.leave.dto.CreateLeaveRequestDto;
 import com.attendance.leave.dto.CancelLeaveRequestDto;
+import com.attendance.leave.dto.HandwrittenSignatureDto;
 import com.attendance.leave.dto.LeaveDetailResponse;
 import com.attendance.leave.dto.LeaveStatusOptionResponse;
 import com.attendance.leave.dto.LeaveListItemResponse;
@@ -163,14 +164,23 @@ public class LeaveService {
         request.setCurrentStep(steps.get(0).getStepNo());
         request.setCurrentActionType(steps.get(0).getActionType());
         request.setSubmittedBy(operator.getId());
-        request.setSubmittedAt(LocalDateTime.now());
+        request.setSubmittedAt(dto.getSubmittedAt());
         request.setCreatedBy(operator.getId());
+
         leaveRequestMapper.insert(request);
 
+        String firstApproverRoleCode = null;
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
-            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approver == null ? null : approver.getId()));
+            Long approverUserId = approver == null ? null : approver.getId();
+            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approverUserId));
+            if (firstApproverRoleCode == null) {
+                firstApproverRoleCode = step.getApproverRoleCode();
+            }
         }
+
+        request.setCurrentApproverId(firstApproverRoleCode);
+        leaveRequestMapper.updateApprovalState(request);
 
         return getLeaveDetail(request.getId());
     }
@@ -214,15 +224,25 @@ public class LeaveService {
         request.setStatus(LeaveRequestStatus.PENDING);
         request.setCurrentStep(steps.get(0).getStepNo());
         request.setCurrentActionType(steps.get(0).getActionType());
-        request.setSubmittedAt(LocalDateTime.now());
+        request.setSubmittedAt(dto.getSubmittedAt());
         request.setFinalApprovedAt(null);
+
         leaveRequestMapper.updateEditableRejected(request);
 
         leaveApprovalMapper.deleteByLeaveRequestId(leaveId);
+        String firstApproverRoleCode = null;
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
-            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approver == null ? null : approver.getId()));
+            Long approverUserId = approver == null ? null : approver.getId();
+            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approverUserId));
+            if (firstApproverRoleCode == null) {
+                firstApproverRoleCode = step.getApproverRoleCode();
+            }
         }
+
+        request.setCurrentApproverId(firstApproverRoleCode);
+        leaveRequestMapper.updateApprovalState(request);
+
         return getLeaveDetail(leaveId);
     }
 
@@ -297,6 +317,56 @@ public class LeaveService {
     }
 
     @Transactional
+    public LeaveDetailResponse uploadHandwrittenSignature(Long leaveId, HandwrittenSignatureDto dto) {
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        String type = dto.getApplicantType().trim().toUpperCase();
+        if (!"APPLICANT".equals(type) && !"TEAM_LEADER".equals(type)) {
+            throw new BizException("签名类型只能是 APPLICANT或 TEAM_LEADER，分别为请假人姓名、班组长姓名");
+        }
+
+        if (dto.getSignatureFile() == null || dto.getSignatureFile().isEmpty()) {
+            throw new BizException("签名文件不能为空");
+        }
+        try {
+            String url = saveHandwrittenSignatureFile(leaveId, type, dto.getSignatureFile().getOriginalFilename(),
+                    dto.getSignatureFile().getInputStream());
+            if ("APPLICANT".equals(type)) {
+                leaveRequestMapper.updateApplicantSignatureUrl(leaveId, url);
+                request.setApplicantSignatureUrl(url);
+            } else {
+                leaveRequestMapper.updateTeamLeaderSignatureUrl(leaveId, url);
+                request.setTeamLeaderSignatureUrl(url);
+            }
+            return getLeaveDetail(leaveId);
+        } catch (IOException ex) {
+            throw new BizException("手写签名上传失败");
+        }
+    }
+
+    private String saveHandwrittenSignatureFile(Long leaveId, String type, String originalName, java.io.InputStream inputStream) throws IOException {
+        Path directory = Paths.get(fileStoragePath, "handwritten-signatures");
+        Files.createDirectories(directory);
+        String extension = originalName != null && originalName.contains(".")
+                ? originalName.substring(originalName.lastIndexOf('.')) : ".png";
+        String filename = "leave_" + leaveId + "_" + type.toLowerCase() + "_" + UUID.randomUUID().toString().replace("-", "") + extension;
+        Path target = directory.resolve(filename);
+        Files.copy(inputStream, target, StandardCopyOption.REPLACE_EXISTING);
+        return "/files/handwritten-signatures/" + filename;
+    }
+
+    @Transactional
+    public LeaveDetailResponse updateSubmittedAt(Long leaveId, LocalDateTime submittedAt) {
+        UserAccount operator = requireCurrentUser();
+        if (!"SYSTEM_ADMIN".equals(operator.getRoleCode())) {
+            throw new BizException("只有超级管理员可以修改申请时间");
+        }
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        leaveRequestMapper.updateSubmittedAt(leaveId, submittedAt);
+        request.setSubmittedAt(submittedAt);
+        return getLeaveDetail(leaveId);
+    }
+
+    @Transactional
     public LeaveDetailResponse selectApprovers(Long leaveId, SelectApproversDto dto) {
         UserAccount operator = requireCurrentUser();
         LeaveRequest request = requireLeaveRequest(leaveId);
@@ -325,6 +395,72 @@ public class LeaveService {
         }
 
         moveToNextStep(request);
+        return getLeaveDetail(leaveId);
+    }
+
+    @Transactional
+    public LeaveDetailResponse reSelectApprovers(Long leaveId, SelectApproversDto dto) {
+        UserAccount operator = requireCurrentUser();
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        ensureNotCancelled(request);
+        if (!LeaveRequestStatus.APPROVING.equals(request.getStatus())) {
+            throw new BizException("当前请假单状态不允许重选领导");
+        }
+
+        List<LeaveApproval> allApprovals = leaveApprovalMapper.findByLeaveRequestId(leaveId);
+
+        LeaveApproval selectApproval = allApprovals.stream()
+                .filter(a -> ACTION_SELECT.equals(a.getActionType())
+                        && ApprovalStatus.APPROVED.equals(a.getApprovalStatus())
+                        && a.getApproverUserId() != null
+                        && a.getApproverUserId().equals(operator.getId()))
+                .max(java.util.Comparator.comparing(LeaveApproval::getStepNo))
+                .orElseThrow(() -> new BizException("未找到已审批的选择领导节点，不能重选"));
+
+        List<LeaveApproval> pendingApproveAfterSelect = allApprovals.stream()
+                .filter(a -> a.getStepNo() > selectApproval.getStepNo()
+                        && ApprovalStatus.PENDING.equals(a.getApprovalStatus())
+                        && ACTION_APPROVE.equals(a.getActionType()))
+                .collect(Collectors.toList());
+
+        if (pendingApproveAfterSelect.isEmpty()) {
+            throw new BizException("后续领导已审批，不能重选");
+        }
+
+        ApprovalRuleStep selectRuleStep = requireRuleStep(request.getApprovalRuleId(), selectApproval.getRuleStepId());
+        if (dto.getApproverUserIds().size() != selectRuleStep.getAssigneeCount()) {
+            throw new BizException("选择审批人数不正确");
+        }
+
+        LeaveApproval virtualPending = new LeaveApproval();
+        virtualPending.setStepNo(selectApproval.getStepNo());
+        virtualPending.setRuleStepId(selectApproval.getRuleStepId());
+        virtualPending.setActionType(ACTION_SELECT);
+        List<UserAccount> selectedUsers = validateAndResolveSelectedApprovers(request, virtualPending, selectRuleStep, dto.getApproverUserIds());
+
+        leaveApprovalMapper.deletePendingAfterStep(leaveId, selectApproval.getStepNo());
+
+        selectApproval.setApprovalStatus(ApprovalStatus.PENDING);
+        selectApproval.setApproverUserId(operator.getId());
+        selectApproval.setApprovalComment(dto.getComment());
+        selectApproval.setSignatureUrl(null);
+        selectApproval.setApprovedAt(null);
+        leaveApprovalMapper.updateDecision(selectApproval);
+
+        List<LeaveApproval> newTargets = resolveOrCreateSelectedApprovalTargets(request, selectRuleStep, selectedUsers);
+        for (int i = 0; i < selectedUsers.size(); i++) {
+            LeaveApproval target = newTargets.get(i);
+            target.setApproverUserId(selectedUsers.get(i).getId());
+            leaveApprovalMapper.updateApprover(target);
+        }
+
+        request.setStatus(LeaveRequestStatus.APPROVING);
+        request.setCurrentStep(selectApproval.getStepNo());
+        request.setCurrentActionType(ACTION_SELECT);
+        request.setCurrentApproverId(operator.getRoleCode());
+        request.setFinalApprovedAt(null);
+        leaveRequestMapper.updateApprovalState(request);
+
         return getLeaveDetail(leaveId);
     }
 
@@ -417,6 +553,7 @@ public class LeaveService {
         String cancelComment = buildCancelComment(dto);
         request.setStatus(LeaveRequestStatus.CANCELLED);
         request.setCurrentActionType(null);
+        request.setCurrentApproverId(null);
         leaveRequestMapper.updateApprovalState(request);
         leaveApprovalMapper.cancelPendingByLeaveRequestId(leaveId, cancelComment);
         return getLeaveDetail(leaveId);
@@ -457,6 +594,9 @@ public class LeaveService {
                 .submittedBy(request.getSubmittedBy())
                 .submittedAt(request.getSubmittedAt())
                 .finalApprovedAt(request.getFinalApprovedAt())
+                .applicantSignatureUrl(request.getApplicantSignatureUrl())
+                .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
+                .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
                 .pdfUrl(pdfUrl)
                 .approvals(approvals)
                 .build();
@@ -588,7 +728,8 @@ public class LeaveService {
         List<Long> leaveRequestIds = requests.stream()
                 .map(LeaveRequest::getId)
                 .toList();
-        java.util.Map<Long, List<String>> approvedRolesByLeaveId = buildApprovedRolesByLeaveId(leaveRequestIds);
+        List<LeaveApproval> allApprovals = leaveApprovalMapper.findByLeaveRequestIds(leaveRequestIds);
+        java.util.Map<Long, List<String>> approvedRolesByLeaveId = buildApprovedRolesByLeaveId(allApprovals);
         return requests.stream()
                 .map(request -> toLeaveListItemResponse(
                         request,
@@ -601,6 +742,29 @@ public class LeaveService {
         Long count = leaveApprovalMapper.countPendingForUser(operator.getId(), operator.getRoleCode(), operator.getOrgUnitId());
         return PendingSummaryResponse.builder()
                 .pendingCount(count == null ? 0L : count)
+                .build();
+    }
+
+    public PageResponse<LeaveListItemResponse> listAllLeaves(String status, Long leaveTypeId, String applicantName, Integer pageNum, Integer pageSize) {
+        UserAccount operator = requireCurrentUser();
+        if (!"SYSTEM_ADMIN".equals(operator.getRoleCode())) {
+            throw new BizException("只有超级管理员可以查看所有请假记录");
+        }
+        String keyword = applicantName == null ? null : applicantName.trim();
+        if (keyword != null && keyword.isEmpty()) {
+            keyword = null;
+        }
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePageNum - 1) * safePageSize;
+        Long total = leaveRequestMapper.countAll(status, leaveTypeId, keyword);
+        List<LeaveRequest> requests = leaveRequestMapper.findAllPage(status, leaveTypeId, keyword, offset, safePageSize);
+        List<LeaveListItemResponse> records = toLeaveListItemResponses(requests);
+        return PageResponse.<LeaveListItemResponse>builder()
+                .total(total == null ? 0L : total)
+                .pageNum(safePageNum)
+                .pageSize(safePageSize)
+                .records(records)
                 .build();
     }
 
@@ -657,15 +821,18 @@ public class LeaveService {
                 .remark(request.getRemark())
                 .submittedAt(request.getSubmittedAt())
                 .approvedRoles(approvedRoles)
+                .currentApproverId(request.getCurrentApproverId())
+                .applicantSignatureUrl(request.getApplicantSignatureUrl())
+                .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
                 .build();
     }
 
-    private java.util.Map<Long, List<String>> buildApprovedRolesByLeaveId(List<Long> leaveRequestIds) {
-        if (leaveRequestIds == null || leaveRequestIds.isEmpty()) {
+    private java.util.Map<Long, List<String>> buildApprovedRolesByLeaveId(List<LeaveApproval> approvals) {
+        if (approvals == null || approvals.isEmpty()) {
             return Collections.emptyMap();
         }
         java.util.Map<Long, LinkedHashMap<String, Boolean>> roleSetByLeaveId = new java.util.HashMap<>();
-        for (LeaveApproval approval : leaveApprovalMapper.findByLeaveRequestIds(leaveRequestIds)) {
+        for (LeaveApproval approval : approvals) {
             if (!ApprovalStatus.APPROVED.equals(approval.getApprovalStatus())) {
                 continue;
             }
@@ -804,11 +971,13 @@ public class LeaveService {
             request.setStatus(LeaveRequestStatus.APPROVED);
             request.setCurrentStep(ApprovalStep.FINISHED);
             request.setCurrentActionType(null);
+            request.setCurrentApproverId(null);
             request.setFinalApprovedAt(LocalDateTime.now());
         } else {
             request.setStatus(LeaveRequestStatus.APPROVING);
             request.setCurrentStep(nextPending.getStepNo());
             request.setCurrentActionType(nextPending.getActionType());
+            request.setCurrentApproverId(nextPending.getApproverRoleCode());
         }
         leaveRequestMapper.updateApprovalState(request);
     }
@@ -1057,7 +1226,8 @@ public class LeaveService {
     }
 
     private boolean shouldSkipHrApproval(UserAccount operator, String applicantType, LeaveType leaveType) {
-        if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) && isHrAttendanceAdmin(operator)) {
+        if ((APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType))
+                && isHrAttendanceAdmin(operator)) {
             return true;
         }
         if (leaveType == null || leaveType.getLeaveCode() == null) {
@@ -1543,6 +1713,9 @@ public class LeaveService {
                 .submittedBy(request.getSubmittedBy())
                 .submittedAt(request.getSubmittedAt())
                 .finalApprovedAt(request.getFinalApprovedAt())
+                .applicantSignatureUrl(request.getApplicantSignatureUrl())
+                .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
+                .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
                 .approvals(approvals)
                 .build();
         return leaveDocumentService.generatePdf(request.getId(), detail);

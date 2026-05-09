@@ -10,7 +10,9 @@ import com.attendance.leave.dto.CancelLeaveRequestDto;
 import com.attendance.leave.dto.BatchApproveLeaveDto;
 import com.attendance.leave.dto.BatchApproveLeaveResponse;
 import com.attendance.leave.dto.CreateLeaveRequestDto;
+import com.attendance.leave.dto.HandwrittenSignatureDto;
 import com.attendance.leave.dto.LeaveDetailResponse;
+import com.attendance.leave.dto.UpdateLeaveSubmittedTimeDto;
 import com.attendance.leave.dto.LeaveListItemResponse;
 import com.attendance.leave.dto.LeavePdfResponse;
 import com.attendance.leave.dto.LeaveStatusOptionResponse;
@@ -78,6 +80,20 @@ public class LeaveController {
         return ApiResponse.success("撤销成功", leaveService.cancelLeave(leaveId, request));
     }
 
+    @Operation(summary = "上传手写签名", description = "请假人或班组长上传鼠标手写签名/日期图片，type 取值 APPLICANT、APPLICANT_DATE 或 TEAM_LEADER。")
+    @PostMapping("/{leaveId}/handwritten-signature")
+    public ApiResponse<LeaveDetailResponse> uploadHandwrittenSignature(@PathVariable Long leaveId,
+                                                                        @Valid @ModelAttribute HandwrittenSignatureDto request) {
+        return ApiResponse.success("手写签名上传成功", leaveService.uploadHandwrittenSignature(leaveId, request));
+    }
+
+    @Operation(summary = "修改请假单申请时间", description = "超级管理员修改指定请假单的申请时间。")
+    @PutMapping("/{leaveId}/submitted-at")
+    public ApiResponse<LeaveDetailResponse> updateSubmittedAt(@PathVariable Long leaveId,
+                                                               @Valid @RequestBody UpdateLeaveSubmittedTimeDto request) {
+        return ApiResponse.success("申请时间修改成功", leaveService.updateSubmittedAt(leaveId, request.getSubmittedAt()));
+    }
+
     @Operation(summary = "获取审批电子签名", description = "返回当前账号已由超级管理员预先配置的电子签名地址；未配置则不允许审批。")
     @PostMapping("/{leaveId}/approval-signature")
     public ApiResponse<ApprovalSignatureUploadResponse> uploadApprovalSignature(@PathVariable Long leaveId,
@@ -90,6 +106,13 @@ public class LeaveController {
     public ApiResponse<LeaveDetailResponse> selectApprovers(@PathVariable Long leaveId,
                                                             @Valid @RequestBody SelectApproversDto request) {
         return ApiResponse.success("选择审批人完成", leaveService.selectApprovers(leaveId, request));
+    }
+
+    @Operation(summary = "重选后续领导", description = "科室车间负责人在所选领导尚未审批时，可撤销之前的选择并重新选择领导审批人。")
+    @PostMapping("/{leaveId}/reselect-approvers")
+    public ApiResponse<LeaveDetailResponse> reSelectApprovers(@PathVariable Long leaveId,
+                                                              @Valid @RequestBody SelectApproversDto request) {
+        return ApiResponse.success("重选领导成功", leaveService.reSelectApprovers(leaveId, request));
     }
 
     @Operation(summary = "请假单详情", description = "查询单个请假单详情和完整审批记录。")

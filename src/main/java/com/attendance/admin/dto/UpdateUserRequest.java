@@ -9,9 +9,6 @@ public class UpdateUserRequest {
     @NotBlank(message = "账号不能为空")
     private String username;
 
-    @NotBlank(message = "角色编码不能为空")
-    private String roleCode;
-
     @NotBlank(message = "姓名不能为空")
     private String empName;
 
@@ -23,11 +20,11 @@ public class UpdateUserRequest {
     @NotNull(message = "组织不能为空")
     private Long orgUnitId;
 
-    private String dataScope = "SELF";
+    private String dataScope;
 
-    private String approvalScope = "NONE";
+    private String approvalScope;
 
-    private Integer isEnabled = 1;
+    private Integer isEnabled;
 
     private String signatureUrl;
 }
