@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./mvnw compile *)",
+      "Bash(mvn compile *)",
+      "Bash(unzip -l \"Demo-WebSocket - 0x5e.zip\")",
+      "Bash(python3 -c \"import zipfile; z=zipfile.ZipFile\\('Demo-WebSocket - 0x5e.zip'\\); print\\('\\\\n'.join\\(z.namelist\\(\\)\\)\\)\")",
+      "Bash(python3 -c ' *)"
+    ]
+  }
+}
