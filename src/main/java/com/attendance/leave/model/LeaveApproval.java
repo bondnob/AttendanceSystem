@@ -1,5 +1,6 @@
 package com.attendance.leave.model;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Data;
 
@@ -17,6 +18,7 @@ public class LeaveApproval {
     private String approvalStatus;
     private String approvalComment;
     private String signatureUrl;
+    private LocalDate signatureDate;
     private LocalDateTime approvedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

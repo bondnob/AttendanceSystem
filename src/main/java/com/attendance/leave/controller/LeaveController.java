@@ -13,6 +13,7 @@ import com.attendance.leave.dto.CreateLeaveRequestDto;
 import com.attendance.leave.dto.HandwrittenSignatureDto;
 import com.attendance.leave.dto.LeaveDetailResponse;
 import com.attendance.leave.dto.UpdateLeaveSubmittedTimeDto;
+import com.attendance.leave.dto.UpdateSignatureDateDto;
 import com.attendance.leave.dto.LeaveListItemResponse;
 import com.attendance.leave.dto.LeavePdfResponse;
 import com.attendance.leave.dto.LeaveStatusOptionResponse;
@@ -94,6 +95,13 @@ public class LeaveController {
         return ApiResponse.success("申请时间修改成功", leaveService.updateSubmittedAt(leaveId, request.getSubmittedAt()));
     }
 
+    @Operation(summary = "修改审批签字日期", description = "超级管理员修改指定请假单某个审批节点的签字日期。")
+    @PatchMapping("/{leaveId}/signature-date")
+    public ApiResponse<LeaveDetailResponse> updateSignatureDate(@PathVariable Long leaveId,
+                                                                 @Valid @RequestBody UpdateSignatureDateDto request) {
+        return ApiResponse.success("签字日期修改成功", leaveService.updateSignatureDate(leaveId, request.getStepNo(), request.getSignatureDate()));
+    }
+
     @Operation(summary = "获取审批电子签名", description = "返回当前账号已由超级管理员预先配置的电子签名地址；未配置则不允许审批。")
     @PostMapping("/{leaveId}/approval-signature")
     public ApiResponse<ApprovalSignatureUploadResponse> uploadApprovalSignature(@PathVariable Long leaveId,
@@ -148,7 +156,7 @@ public class LeaveController {
         return ApiResponse.success(leaveService.listLeaves(status, leaveTypeId, pageNum, pageSize));
     }
 
-    @Operation(summary = "近三个月请假单列表", description = "根据当前登录人的数据权限返回近三个月请假单列表，仅包含请假开始时间属于本月、上个月、上上个月的数据。")
+    @Operation(summary = "近三个月请假单列表", description = "根据当前登录人的数据权限返回近三个月请假单列表，仅包含上个月、上上个月、上上上个月的数据。")
     @GetMapping("/approval-list/recent-three-months")
     public ApiResponse<PageResponse<LeaveListItemResponse>> listRecentThreeMonthApprovalLeaves(
             @RequestParam(required = false) String status,

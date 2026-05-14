@@ -763,7 +763,7 @@ CREATE TABLE `approval_rule`  (
 -- ----------------------------
 -- Records of approval_rule
 -- ----------------------------
-INSERT INTO `approval_rule` VALUES (1, 'EMPLOYEE_OTHER_FLOW', '普通职工普通假流程', 'EMPLOYEE', 'STAFF', 'OTHER', 0, NULL, NULL, '负责人审批签名，人事科审批签名后返回科室车间负责人，流程结束', 1, '2026-04-17 11:44:34', '2026-04-17 11:44:34');
+INSERT INTO `approval_rule` VALUES (1, 'EMPLOYEE_OTHER_FLOW', '普通职工普通假流程', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, NULL, '负责人审批签名，人事科审批签名后返回科室车间负责人，流程结束', 1, '2026-04-17 11:44:34', '2026-04-17 11:44:34');
 INSERT INTO `approval_rule` VALUES (2, 'EMPLOYEE_SICK_7_WITHIN', '普通职工病假7日内流程', 'EMPLOYEE', 'STAFF', 'SICK', 0, NULL, 7.00, '负责人审批签名，人事科审批签名后返回科室车间负责人，流程结束', 1, '2026-04-17 11:44:34', '2026-04-17 11:44:34');
 INSERT INTO `approval_rule` VALUES (3, 'EMPLOYEE_SICK_7_TO_30', '普通职工病假7日以上1个月内流程', 'EMPLOYEE', 'STAFF', 'SICK', 0, 7.01, 30.00, '负责人审批签名，人事科审批签名后返回科室车间负责人选择主管领导审批', 1, '2026-04-17 11:44:34', '2026-04-17 11:44:34');
 INSERT INTO `approval_rule` VALUES (4, 'EMPLOYEE_SICK_OVER_30', '普通职工病假1个月以上流程', 'EMPLOYEE', 'STAFF', 'SICK', 1, 30.01, NULL, '负责人审批签名，人事科审批签名后返回科室车间负责人先选择副站长审批，再选择站长审批', 1, '2026-04-17 11:44:34', '2026-04-26 20:37:07');

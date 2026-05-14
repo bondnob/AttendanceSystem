@@ -53,7 +53,7 @@ public class JwtTokenProvider {
                     .orgUnitId(Long.valueOf(String.valueOf(claims.get("orgUnitId"))))
                     .build();
         } catch (Exception ex) {
-            throw new BizException("token 无效或已过期");
+            throw new BizException("登录已过期，请重新登录");
         }
     }
 

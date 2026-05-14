@@ -17,16 +17,16 @@ public interface LeaveApprovalMapper {
 
     @Insert("""
             INSERT INTO leave_approval
-            (leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id, approval_status, approval_comment, signature_url)
+            (leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id, approval_status, approval_comment, signature_url, signature_date)
             VALUES
-            (#{leaveRequestId}, #{ruleStepId}, #{stepNo}, #{actionType}, #{stepName}, #{approverRoleCode}, #{approverUserId}, #{approvalStatus}, #{approvalComment}, #{signatureUrl})
+            (#{leaveRequestId}, #{ruleStepId}, #{stepNo}, #{actionType}, #{stepName}, #{approverRoleCode}, #{approverUserId}, #{approvalStatus}, #{approvalComment}, #{signatureUrl}, #{signatureDate})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(LeaveApproval approval);
 
     @Select("""
             SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,
-                   approval_status, approval_comment, signature_url, approved_at, created_at, updated_at
+                   approval_status, approval_comment, signature_url, signature_date, approved_at, created_at, updated_at
             FROM leave_approval
             WHERE leave_request_id = #{leaveRequestId}
             ORDER BY step_no ASC, id ASC
@@ -35,7 +35,7 @@ public interface LeaveApprovalMapper {
 
     @Select({"<script>",
             "SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,",
-            "       approval_status, approval_comment, signature_url, approved_at, created_at, updated_at",
+            "       approval_status, approval_comment, signature_url, signature_date, approved_at, created_at, updated_at",
             "FROM leave_approval",
             "WHERE leave_request_id IN",
             "  <foreach collection='leaveRequestIds' item='leaveRequestId' open='(' separator=',' close=')'>",
@@ -47,7 +47,7 @@ public interface LeaveApprovalMapper {
 
     @Select("""
             SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,
-                   approval_status, approval_comment, signature_url, approved_at, created_at, updated_at
+                   approval_status, approval_comment, signature_url, signature_date, approved_at, created_at, updated_at
             FROM leave_approval
             WHERE leave_request_id = #{leaveRequestId}
               AND step_no = #{stepNo}
@@ -58,7 +58,7 @@ public interface LeaveApprovalMapper {
 
     @Select("""
             SELECT id, leave_request_id, rule_step_id, step_no, action_type, step_name, approver_role_code, approver_user_id,
-                   approval_status, approval_comment, signature_url, approved_at, created_at, updated_at
+                   approval_status, approval_comment, signature_url, signature_date, approved_at, created_at, updated_at
             FROM leave_approval
             WHERE leave_request_id = #{leaveRequestId}
               AND approval_status = 'PENDING'
@@ -73,6 +73,7 @@ public interface LeaveApprovalMapper {
                 approval_status = #{approvalStatus},
                 approval_comment = #{approvalComment},
                 signature_url = #{signatureUrl},
+                signature_date = #{signatureDate},
                 approved_at = #{approvedAt},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
@@ -153,6 +154,17 @@ public interface LeaveApprovalMapper {
     Long countMonthlyProcessedByUser(@Param("userId") Long userId,
                                      @Param("monthStart") java.time.LocalDateTime monthStart,
                                      @Param("monthEnd") java.time.LocalDateTime monthEnd);
+
+    @Update("""
+            UPDATE leave_approval
+            SET signature_date = #{signatureDate},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE leave_request_id = #{leaveRequestId}
+              AND step_no = #{stepNo}
+            """)
+    int updateSignatureDate(@Param("leaveRequestId") Long leaveRequestId,
+                            @Param("stepNo") Integer stepNo,
+                            @Param("signatureDate") java.time.LocalDate signatureDate);
 
     @Delete("""
             DELETE FROM leave_approval

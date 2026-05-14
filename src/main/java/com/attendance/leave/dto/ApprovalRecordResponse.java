@@ -1,5 +1,6 @@
 package com.attendance.leave.dto;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.Builder;
 import lombok.Data;
@@ -19,5 +20,6 @@ public class ApprovalRecordResponse {
     private String approvalStatus;
     private String approvalComment;
     private String signatureUrl;
+    private LocalDate signatureDate;
     private LocalDateTime approvedAt;
 }

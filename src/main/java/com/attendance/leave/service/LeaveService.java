@@ -258,7 +258,7 @@ public class LeaveService {
     @Transactional
     public LeaveDetailResponse approve(Long leaveId, ApproveLeaveWithSignatureDto dto) {
         UserAccount operator = requireCurrentUser();
-        return approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(), dto.getSignatureFile(), dto.getSignatureUrl(), null);
+        return approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(), dto.getSignatureFile(), dto.getSignatureUrl(), null, dto.getSignatureDate());
     }
 
     @Transactional
@@ -278,7 +278,7 @@ public class LeaveService {
         List<LeaveDetailResponse> records = new ArrayList<>();
         for (Long leaveId : dto.getLeaveIds()) {
             records.add(approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(),
-                    null, dto.getSignatureUrl(), signatureBytes == null ? null : new BatchSignaturePayload(signatureBytes, originalFilename)));
+                    null, dto.getSignatureUrl(), signatureBytes == null ? null : new BatchSignaturePayload(signatureBytes, originalFilename), dto.getSignatureDate()));
         }
         return BatchApproveLeaveResponse.builder()
                 .approvedCount(records.size())
@@ -367,6 +367,20 @@ public class LeaveService {
     }
 
     @Transactional
+    public LeaveDetailResponse updateSignatureDate(Long leaveId, Integer stepNo, java.time.LocalDate signatureDate) {
+        UserAccount operator = requireCurrentUser();
+        if (!"SYSTEM_ADMIN".equals(operator.getRoleCode())) {
+            throw new BizException("只有超级管理员可以修改签字日期");
+        }
+        requireLeaveRequest(leaveId);
+        int rows = leaveApprovalMapper.updateSignatureDate(leaveId, stepNo, signatureDate);
+        if (rows == 0) {
+            throw new BizException("未找到对应的审批节点");
+        }
+        return getLeaveDetail(leaveId);
+    }
+
+    @Transactional
     public LeaveDetailResponse selectApprovers(Long leaveId, SelectApproversDto dto) {
         UserAccount operator = requireCurrentUser();
         LeaveRequest request = requireLeaveRequest(leaveId);
@@ -384,7 +398,7 @@ public class LeaveService {
 
         List<UserAccount> selectedUsers = validateAndResolveSelectedApprovers(request, pending, currentRuleStep, dto.getApproverUserIds());
 
-        decideApproval(pending, operator.getId(), true, dto.getComment(), null);
+        decideApproval(pending, operator.getId(), true, dto.getComment(), null, null);
 
         List<LeaveApproval> targets = resolveOrCreateSelectedApprovalTargets(request, currentRuleStep, selectedUsers);
 
@@ -705,8 +719,8 @@ public class LeaveService {
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
         int offset = (safePageNum - 1) * safePageSize;
-        LocalDateTime monthEnd = currentMonthStart().plusMonths(1);
-        LocalDateTime monthStart = currentMonthStart().minusMonths(2);
+        LocalDateTime monthEnd = currentMonthStart();
+        LocalDateTime monthStart = currentMonthStart().minusMonths(3);
 
         Long total = leaveRequestMapper.countByScope(
                 orgUnitId, applicantId, normalizedStatus, leaveTypeId, monthStart, monthEnd);
@@ -730,10 +744,12 @@ public class LeaveService {
                 .toList();
         List<LeaveApproval> allApprovals = leaveApprovalMapper.findByLeaveRequestIds(leaveRequestIds);
         java.util.Map<Long, List<String>> approvedRolesByLeaveId = buildApprovedRolesByLeaveId(allApprovals);
+        java.util.Map<Long, List<ApprovalRecordResponse>> approvalsByLeaveId = buildApprovalsByLeaveId(allApprovals);
         return requests.stream()
                 .map(request -> toLeaveListItemResponse(
                         request,
-                        approvedRolesByLeaveId.getOrDefault(request.getId(), List.of())))
+                        approvedRolesByLeaveId.getOrDefault(request.getId(), List.of()),
+                        approvalsByLeaveId.getOrDefault(request.getId(), List.of())))
                 .collect(Collectors.toList());
     }
 
@@ -757,8 +773,9 @@ public class LeaveService {
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
         int offset = (safePageNum - 1) * safePageSize;
-        Long total = leaveRequestMapper.countAll(status, leaveTypeId, keyword);
-        List<LeaveRequest> requests = leaveRequestMapper.findAllPage(status, leaveTypeId, keyword, offset, safePageSize);
+        LocalDateTime threeMonthsAgo = LocalDateTime.now().minusMonths(3);
+        Long total = leaveRequestMapper.countAll(status, leaveTypeId, keyword, threeMonthsAgo);
+        List<LeaveRequest> requests = leaveRequestMapper.findAllPage(status, leaveTypeId, keyword, threeMonthsAgo, offset, safePageSize);
         List<LeaveListItemResponse> records = toLeaveListItemResponses(requests);
         return PageResponse.<LeaveListItemResponse>builder()
                 .total(total == null ? 0L : total)
@@ -798,7 +815,8 @@ public class LeaveService {
         );
     }
 
-    private LeaveListItemResponse toLeaveListItemResponse(LeaveRequest request, List<String> approvedRoles) {
+    private LeaveListItemResponse toLeaveListItemResponse(LeaveRequest request, List<String> approvedRoles,
+                                                           List<ApprovalRecordResponse> approvals) {
         LeaveType leaveType = requireLeaveType(request.getLeaveTypeId());
         return LeaveListItemResponse.builder()
                 .id(request.getId())
@@ -824,7 +842,20 @@ public class LeaveService {
                 .currentApproverId(request.getCurrentApproverId())
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .approvals(approvals)
                 .build();
+    }
+
+    private java.util.Map<Long, List<ApprovalRecordResponse>> buildApprovalsByLeaveId(List<LeaveApproval> approvals) {
+        if (approvals == null || approvals.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        java.util.Map<Long, List<ApprovalRecordResponse>> result = new java.util.HashMap<>();
+        for (LeaveApproval approval : approvals) {
+            result.computeIfAbsent(approval.getLeaveRequestId(), key -> new ArrayList<>())
+                    .add(toApprovalRecordResponse(approval));
+        }
+        return result;
     }
 
     private java.util.Map<Long, List<String>> buildApprovedRolesByLeaveId(List<LeaveApproval> approvals) {
@@ -892,7 +923,8 @@ public class LeaveService {
 
     private LeaveDetailResponse approveInternal(UserAccount operator, Long leaveId, Boolean approved, String comment,
                                                 org.springframework.web.multipart.MultipartFile signatureFile,
-                                                String signatureUrl, BatchSignaturePayload batchSignaturePayload) {
+                                                String signatureUrl, BatchSignaturePayload batchSignaturePayload,
+                                                java.time.LocalDate signatureDate) {
         LeaveRequest request = requireLeaveRequest(leaveId);
         ensureNotCancelled(request);
         LeaveApproval pending = requireCurrentPendingApproval(request);
@@ -914,7 +946,7 @@ public class LeaveService {
             }
         }
 
-        decideApproval(pending, operator.getId(), approved, comment, finalSignatureUrl);
+        decideApproval(pending, operator.getId(), approved, comment, finalSignatureUrl, signatureDate);
 
         if (Boolean.FALSE.equals(approved)) {
             request.setStatus(LeaveRequestStatus.REJECTED);
@@ -1068,8 +1100,10 @@ public class LeaveService {
         if (LEAVE_SCOPE_ALL.equals(rule.getLeaveScope())) {
             return true;
         }
-        return exceedsOneMonth == (rule.getExceedsMonthOnly() != null && rule.getExceedsMonthOnly() == 1)
-                || (!exceedsOneMonth && (rule.getExceedsMonthOnly() == null || rule.getExceedsMonthOnly() == 0));
+        if (rule.getExceedsMonthOnly() == null) {
+            return true;
+        }
+        return exceedsOneMonth == (rule.getExceedsMonthOnly() == 1);
     }
 
     private String resolveLeaveScope(LeaveType leaveType) {
@@ -1593,11 +1627,12 @@ public class LeaveService {
         return resolvePositionLevel(applicantType, actualPositionLevel);
     }
 
-    private void decideApproval(LeaveApproval approval, Long approverUserId, Boolean approved, String comment, String signatureUrl) {
+    private void decideApproval(LeaveApproval approval, Long approverUserId, Boolean approved, String comment, String signatureUrl, java.time.LocalDate signatureDate) {
         approval.setApproverUserId(approverUserId);
         approval.setApprovalStatus(Boolean.TRUE.equals(approved) ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED);
         approval.setApprovalComment(comment);
         approval.setSignatureUrl(normalizeSignatureUrl(signatureUrl));
+        approval.setSignatureDate(signatureDate != null ? signatureDate : java.time.LocalDate.now());
         approval.setApprovedAt(LocalDateTime.now());
         leaveApprovalMapper.updateDecision(approval);
     }
@@ -1676,6 +1711,7 @@ public class LeaveService {
                 .approvalStatus(approval.getApprovalStatus())
                 .approvalComment(approval.getApprovalComment())
                 .signatureUrl(approval.getSignatureUrl())
+                .signatureDate(approval.getSignatureDate())
                 .approvedAt(approval.getApprovedAt())
                 .build();
     }

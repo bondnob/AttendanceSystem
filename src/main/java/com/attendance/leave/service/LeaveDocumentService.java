@@ -236,7 +236,10 @@ public class LeaveDocumentService {
             canvas.addImage(signature);
             canvas.restoreState();
         }
-        writeDateSplit(canvas, font, slot.approval().getApprovedAt(),
+        java.time.LocalDateTime signatureTime = slot.approval().getSignatureDate() != null
+                ? slot.approval().getSignatureDate().atStartOfDay()
+                : slot.approval().getApprovedAt();
+        writeDateSplit(canvas, font, signatureTime,
                 slot.dateYearX(),
                 slot.dateMonthX(),
                 slot.dateDayX(),
