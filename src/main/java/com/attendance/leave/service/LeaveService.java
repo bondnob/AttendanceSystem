@@ -79,9 +79,11 @@ public class LeaveService {
     private static final String APPLICANT_TYPE_CADRE = "CADRE";
     private static final String APPLICANT_TYPE_GENERAL_CADRE = "GENERAL_CADRE";
     private static final String APPLICANT_TYPE_SECTION_LEVEL_CADRE = "SECTION_LEVEL_CADRE";
+    private static final String APPLICANT_TYPE_WORKSHOP_DIRECTOR = "WORKSHOP_DIRECTOR";
     private static final String POSITION_STAFF = "STAFF";
     private static final String POSITION_GENERAL_CADRE = "GENERAL_CADRE";
     private static final String POSITION_SECTION_LEVEL = "SECTION_LEVEL";
+    private static final String POSITION_WORKSHOP_DIRECTOR = "WORKSHOP_DIRECTOR";
     private static final String LEAVE_SCOPE_ALL = "ALL";
     private static final String LEAVE_SCOPE_OTHER = "OTHER";
     private static final String LEAVE_SCOPE_SICK = "SICK";
@@ -139,6 +141,9 @@ public class LeaveService {
         String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
         validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
         List<ApprovalRuleStep> steps = prepareCreationSteps(rule.getId(), operator, applicantType, leaveType);
+        if (Boolean.TRUE.equals(dto.getPartySecretaryFirst())) {
+            swapPartySecretaryBeforeStationmaster(steps);
+        }
 
         LeaveRequest request = new LeaveRequest();
         request.setRequestNo(generateRequestNo());
@@ -166,18 +171,24 @@ public class LeaveService {
         request.setSubmittedBy(operator.getId());
         request.setSubmittedAt(dto.getSubmittedAt());
         request.setCreatedBy(operator.getId());
+        request.setPartySecretaryFirst(Boolean.TRUE.equals(dto.getPartySecretaryFirst()) ? 1 : 0);
 
         leaveRequestMapper.insert(request);
 
         String firstApproverRoleCode = null;
+        List<LeaveApproval> newApprovals = new ArrayList<>();
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
             Long approverUserId = approver == null ? null : approver.getId();
-            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approverUserId));
+            LeaveApproval approval = buildApproval(request.getId(), step, approverUserId);
+            leaveApprovalMapper.insert(approval);
+            newApprovals.add(approval);
             if (firstApproverRoleCode == null) {
                 firstApproverRoleCode = step.getApproverRoleCode();
             }
         }
+        swapApprovalStepNoIfNeeded(request, newApprovals);
+        request.setCurrentStep(newApprovals.get(0).getStepNo());
 
         request.setCurrentApproverId(firstApproverRoleCode);
         leaveRequestMapper.updateApprovalState(request);
@@ -201,6 +212,9 @@ public class LeaveService {
         String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
         validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
         List<ApprovalRuleStep> steps = prepareCreationSteps(rule.getId(), operator, applicantType, leaveType);
+        if (Boolean.TRUE.equals(dto.getPartySecretaryFirst())) {
+            swapPartySecretaryBeforeStationmaster(steps);
+        }
 
         request.setRequestNo(generateRequestNo());
         request.setApplicantId(applicant.getId());
@@ -226,19 +240,25 @@ public class LeaveService {
         request.setCurrentActionType(steps.get(0).getActionType());
         request.setSubmittedAt(dto.getSubmittedAt());
         request.setFinalApprovedAt(null);
+        request.setPartySecretaryFirst(Boolean.TRUE.equals(dto.getPartySecretaryFirst()) ? 1 : 0);
 
         leaveRequestMapper.updateEditableRejected(request);
 
         leaveApprovalMapper.deleteByLeaveRequestId(leaveId);
         String firstApproverRoleCode = null;
+        List<LeaveApproval> newApprovals = new ArrayList<>();
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
             Long approverUserId = approver == null ? null : approver.getId();
-            leaveApprovalMapper.insert(buildApproval(request.getId(), step, approverUserId));
+            LeaveApproval approval = buildApproval(request.getId(), step, approverUserId);
+            leaveApprovalMapper.insert(approval);
+            newApprovals.add(approval);
             if (firstApproverRoleCode == null) {
                 firstApproverRoleCode = step.getApproverRoleCode();
             }
         }
+        swapApprovalStepNoIfNeeded(request, newApprovals);
+        request.setCurrentStep(newApprovals.get(0).getStepNo());
 
         request.setCurrentApproverId(firstApproverRoleCode);
         leaveRequestMapper.updateApprovalState(request);
@@ -402,11 +422,16 @@ public class LeaveService {
 
         List<LeaveApproval> targets = resolveOrCreateSelectedApprovalTargets(request, currentRuleStep, selectedUsers);
 
-        for (int i = 0; i < selectedUsers.size(); i++) {
-            LeaveApproval target = targets.get(i);
-            target.setApproverUserId(selectedUsers.get(i).getId());
-            leaveApprovalMapper.updateApprover(target);
+        java.util.Map<String, UserAccount> userByRole = selectedUsers.stream()
+                .collect(Collectors.toMap(UserAccount::getRoleCode, u -> u, (left, right) -> left));
+        for (LeaveApproval target : targets) {
+            UserAccount user = userByRole.get(target.getApproverRoleCode());
+            if (user != null) {
+                target.setApproverUserId(user.getId());
+                leaveApprovalMapper.updateApprover(target);
+            }
         }
+        swapApprovalStepNoIfNeeded(request, targets);
 
         moveToNextStep(request);
         return getLeaveDetail(leaveId);
@@ -462,11 +487,16 @@ public class LeaveService {
         leaveApprovalMapper.updateDecision(selectApproval);
 
         List<LeaveApproval> newTargets = resolveOrCreateSelectedApprovalTargets(request, selectRuleStep, selectedUsers);
-        for (int i = 0; i < selectedUsers.size(); i++) {
-            LeaveApproval target = newTargets.get(i);
-            target.setApproverUserId(selectedUsers.get(i).getId());
-            leaveApprovalMapper.updateApprover(target);
+        java.util.Map<String, UserAccount> userByRole = selectedUsers.stream()
+                .collect(Collectors.toMap(UserAccount::getRoleCode, u -> u, (left, right) -> left));
+        for (LeaveApproval target : newTargets) {
+            UserAccount user = userByRole.get(target.getApproverRoleCode());
+            if (user != null) {
+                target.setApproverUserId(user.getId());
+                leaveApprovalMapper.updateApprover(target);
+            }
         }
+        swapApprovalStepNoIfNeeded(request, newTargets);
 
         request.setStatus(LeaveRequestStatus.APPROVING);
         request.setCurrentStep(selectApproval.getStepNo());
@@ -492,9 +522,9 @@ public class LeaveService {
                         || currentRuleStep.getCandidateGroup().equals(step.getCandidateGroup()))
                 .collect(Collectors.toList());
         if (SelectionScenario.SECTION_LEVEL.equals(scenario)) {
-            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers);
+            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers, Integer.valueOf(1).equals(request.getPartySecretaryFirst()));
         } else if (SelectionScenario.SICK_OVER_MONTH.equals(scenario)) {
-            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers);
+            selectedSteps = sortSectionLevelSelectedSteps(selectedSteps, selectedUsers, false);
         }
         if (selectedSteps.size() < targetCount) {
             throw new BizException("后续领导审批节点配置不完整");
@@ -522,8 +552,31 @@ public class LeaveService {
         return targets;
     }
 
+    private void swapApprovalStepNoIfNeeded(LeaveRequest request, List<LeaveApproval> approvals) {
+        if (!Integer.valueOf(1).equals(request.getPartySecretaryFirst())) {
+            return;
+        }
+        LeaveApproval sm = null;
+        LeaveApproval ps = null;
+        for (LeaveApproval a : approvals) {
+            if (RoleCode.STATIONMASTER.equals(a.getApproverRoleCode())) {
+                sm = a;
+            } else if (RoleCode.PARTY_SECRETARY.equals(a.getApproverRoleCode())) {
+                ps = a;
+            }
+        }
+        if (sm != null && ps != null && sm.getStepNo() < ps.getStepNo()) {
+            Integer smStepNo = sm.getStepNo();
+            sm.setStepNo(ps.getStepNo());
+            ps.setStepNo(smStepNo);
+            leaveApprovalMapper.updateStepNo(sm.getId(), sm.getStepNo());
+            leaveApprovalMapper.updateStepNo(ps.getId(), ps.getStepNo());
+        }
+    }
+
     private List<ApprovalRuleStep> sortSectionLevelSelectedSteps(List<ApprovalRuleStep> selectedSteps,
-                                                                 List<UserAccount> selectedUsers) {
+                                                                 List<UserAccount> selectedUsers,
+                                                                 boolean partySecretaryFirst) {
         java.util.Map<String, ApprovalRuleStep> stepByRoleCode = selectedSteps.stream()
                 .collect(Collectors.toMap(ApprovalRuleStep::getApproverRoleCode, step -> step, (left, right) -> left));
         List<ApprovalRuleStep> orderedSteps = new ArrayList<>();
@@ -533,6 +586,22 @@ public class LeaveService {
                 throw new BizException("所选领导与审批节点配置不匹配");
             }
             orderedSteps.add(step);
+        }
+        if (partySecretaryFirst) {
+            int stationmasterIdx = -1;
+            int partySecretaryIdx = -1;
+            for (int i = 0; i < orderedSteps.size(); i++) {
+                if (RoleCode.STATIONMASTER.equals(orderedSteps.get(i).getApproverRoleCode())) {
+                    stationmasterIdx = i;
+                } else if (RoleCode.PARTY_SECRETARY.equals(orderedSteps.get(i).getApproverRoleCode())) {
+                    partySecretaryIdx = i;
+                }
+            }
+            if (stationmasterIdx >= 0 && partySecretaryIdx >= 0 && partySecretaryIdx > stationmasterIdx) {
+                ApprovalRuleStep temp = orderedSteps.get(stationmasterIdx);
+                orderedSteps.set(stationmasterIdx, orderedSteps.get(partySecretaryIdx));
+                orderedSteps.set(partySecretaryIdx, temp);
+            }
         }
         return orderedSteps;
     }
@@ -611,6 +680,7 @@ public class LeaveService {
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .partySecretaryFirst(request.getPartySecretaryFirst())
                 .pdfUrl(pdfUrl)
                 .approvals(approvals)
                 .build();
@@ -800,7 +870,8 @@ public class LeaveService {
                     LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.CANCELLED).name("已撤销").build()
             );
         }
-        if (RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())) {
+        if (RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())
+                || RoleCode.WORKSHOP_PARTY_SECRETARY.equals(operator.getRoleCode())) {
             return List.of(
                     LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.PENDING).name("待审批").build(),
                     LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.APPROVING).name("审批中").build(),
@@ -842,6 +913,7 @@ public class LeaveService {
                 .currentApproverId(request.getCurrentApproverId())
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .partySecretaryFirst(request.getPartySecretaryFirst())
                 .approvals(approvals)
                 .build();
     }
@@ -963,6 +1035,7 @@ public class LeaveService {
     private boolean shouldUsePendingApproverView(UserAccount operator) {
         return !RoleCode.ATTENDANCE_ADMIN.equals(operator.getRoleCode())
                 && !RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())
+                && !RoleCode.WORKSHOP_PARTY_SECRETARY.equals(operator.getRoleCode())
                 && !"NONE".equals(operator.getApprovalScope());
     }
 
@@ -982,7 +1055,8 @@ public class LeaveService {
             return status;
         }
 
-        if (RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())) {
+        if (RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())
+                || RoleCode.WORKSHOP_PARTY_SECRETARY.equals(operator.getRoleCode())) {
             if (!List.of(LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVING,
                     LeaveRequestStatus.APPROVED, LeaveRequestStatus.REJECTED).contains(status)) {
                 throw new BizException("科室车间负责人仅可查询待审批、审批中、已通过、已驳回状态");
@@ -1053,6 +1127,9 @@ public class LeaveService {
         if (APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType)) {
             return POSITION_SECTION_LEVEL;
         }
+        if (APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(applicantType)) {
+            return POSITION_WORKSHOP_DIRECTOR;
+        }
         if (APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)) {
             return POSITION_GENERAL_CADRE;
         }
@@ -1079,7 +1156,11 @@ public class LeaveService {
                 || POSITION_SECTION_LEVEL.equalsIgnoreCase(applicantType)) {
             return APPLICANT_TYPE_SECTION_LEVEL_CADRE;
         }
-        throw new BizException("人员类别只能是 职工、一般干部、中层正职");
+        if (APPLICANT_TYPE_WORKSHOP_DIRECTOR.equalsIgnoreCase(applicantType)
+                || POSITION_WORKSHOP_DIRECTOR.equalsIgnoreCase(applicantType)) {
+            return APPLICANT_TYPE_WORKSHOP_DIRECTOR;
+        }
+        throw new BizException("人员类别只能是 职工、一般干部、中层正职、车间主任");
     }
 
     private boolean matchesScope(String ruleScope, String actualScope) {
@@ -1259,8 +1340,25 @@ public class LeaveService {
         return effectiveRuleSteps;
     }
 
+    private void swapPartySecretaryBeforeStationmaster(List<ApprovalRuleStep> steps) {
+        int stationmasterIdx = -1;
+        int partySecretaryIdx = -1;
+        for (int i = 0; i < steps.size(); i++) {
+            if (RoleCode.STATIONMASTER.equals(steps.get(i).getApproverRoleCode())) {
+                stationmasterIdx = i;
+            } else if (RoleCode.PARTY_SECRETARY.equals(steps.get(i).getApproverRoleCode())) {
+                partySecretaryIdx = i;
+            }
+        }
+        if (stationmasterIdx >= 0 && partySecretaryIdx >= 0 && partySecretaryIdx > stationmasterIdx) {
+            ApprovalRuleStep temp = steps.get(stationmasterIdx);
+            steps.set(stationmasterIdx, steps.get(partySecretaryIdx));
+            steps.set(partySecretaryIdx, temp);
+        }
+    }
+
     private boolean shouldSkipHrApproval(UserAccount operator, String applicantType, LeaveType leaveType) {
-        if ((APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType))
+        if ((APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType) || APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(applicantType))
                 && isHrAttendanceAdmin(operator)) {
             return true;
         }
@@ -1272,7 +1370,8 @@ public class LeaveService {
         }
         return APPLICANT_TYPE_EMPLOYEE.equals(applicantType)
                 || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
-                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType);
+                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType)
+                || APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(applicantType);
     }
 
     private boolean isHrApprovalStep(ApprovalRuleStep step) {
@@ -1486,6 +1585,7 @@ public class LeaveService {
             case RoleCode.DEPUTY_STATIONMASTER -> CANDIDATE_GROUP_SUPERVISOR;
             case RoleCode.STATIONMASTER -> CANDIDATE_GROUP_STATIONMASTER;
             case RoleCode.PARTY_SECRETARY -> CANDIDATE_GROUP_PARTY_AND_PRINCIPAL;
+            case RoleCode.WORKSHOP_PARTY_SECRETARY -> CANDIDATE_GROUP_PARTY_AND_PRINCIPAL;
             default -> null;
         };
     }
@@ -1521,6 +1621,10 @@ public class LeaveService {
             if (leaveDays.compareTo(DAY_10) > 0) {
                 return SelectionScenario.PERSONAL_10_TO_30;
             }
+        }
+
+        if (LEAVE_SCOPE_OTHER.equals(leaveScope)) {
+            return SelectionScenario.SECTION_LEVEL;
         }
         return SelectionScenario.NONE;
     }
@@ -1752,6 +1856,7 @@ public class LeaveService {
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .partySecretaryFirst(request.getPartySecretaryFirst())
                 .approvals(approvals)
                 .build();
         return leaveDocumentService.generatePdf(request.getId(), detail);
@@ -1796,7 +1901,8 @@ public class LeaveService {
         String inputName = dto.getApplicantName() == null ? null : dto.getApplicantName().trim();
         if ((APPLICANT_TYPE_EMPLOYEE.equals(applicantType)
                 || APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType)
-                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType))
+                || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType)
+                || APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(applicantType))
                 && inputName != null && !inputName.isBlank()) {
             return inputName;
         }
@@ -1839,6 +1945,7 @@ public class LeaveService {
         return switch (roleCode) {
             case RoleCode.ATTENDANCE_ADMIN -> "考勤管理员";
             case RoleCode.ORG_PRINCIPAL -> "科室车间负责人";
+            case RoleCode.WORKSHOP_PARTY_SECRETARY -> "车间书记";
             case RoleCode.HR_SECTION_CHIEF -> "劳动人事科科长";
             case RoleCode.DEPUTY_STATIONMASTER -> "主管站长";
             case RoleCode.STATIONMASTER -> "站长";

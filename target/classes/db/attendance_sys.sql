@@ -739,6 +739,135 @@ INSERT INTO `approval_permission` VALUES (695, 29, 'ORG_PRINCIPAL', 'EMPLOYEE', 
 INSERT INTO `approval_permission` VALUES (696, 29, 'ORG_PRINCIPAL', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-04-18 11:57:29', '2026-04-18 17:22:22');
 
 -- ----------------------------
+-- 车间书记审批权限 (WORKSHOP_PARTY_SECRETARY)
+-- ----------------------------
+-- W01 运转一车间 (org_unit_id=10)
+INSERT INTO `approval_permission` VALUES (700, 10, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (701, 10, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (702, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (703, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 10.01, 30.00, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (704, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 5.01, 10.00, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (705, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', NULL, 5.00, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (706, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (707, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', 7.01, 30.00, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (708, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, 7.00, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (709, 10, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W02 运转二车间 (org_unit_id=11)
+INSERT INTO `approval_permission` VALUES (710, 11, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (711, 11, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (712, 11, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (713, 11, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (714, 11, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W03 运转三车间 (org_unit_id=12)
+INSERT INTO `approval_permission` VALUES (715, 12, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (716, 12, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (717, 12, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (718, 12, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (719, 12, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W04 运转四车间 (org_unit_id=13)
+INSERT INTO `approval_permission` VALUES (720, 13, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (721, 13, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (722, 13, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (723, 13, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (724, 13, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W05 调度车间 (org_unit_id=14)
+INSERT INTO `approval_permission` VALUES (725, 14, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (726, 14, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (727, 14, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (728, 14, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (729, 14, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W06 货检车间 (org_unit_id=15)
+INSERT INTO `approval_permission` VALUES (730, 15, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (731, 15, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (732, 15, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (733, 15, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (734, 15, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W07 设备检修车间 (org_unit_id=16)
+INSERT INTO `approval_permission` VALUES (735, 16, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (736, 16, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (737, 16, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (738, 16, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (739, 16, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W08 塘沽运转车间 (org_unit_id=17)
+INSERT INTO `approval_permission` VALUES (740, 17, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (741, 17, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (742, 17, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (743, 17, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (744, 17, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W09 新港编组场车间 (org_unit_id=18)
+INSERT INTO `approval_permission` VALUES (745, 18, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (746, 18, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (747, 18, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (748, 18, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (749, 18, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W10 新港一区运转车间 (org_unit_id=19)
+INSERT INTO `approval_permission` VALUES (750, 19, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (751, 19, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (752, 19, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (753, 19, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (754, 19, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W11 新港二区运转车间 (org_unit_id=20)
+INSERT INTO `approval_permission` VALUES (755, 20, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (756, 20, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (757, 20, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (758, 20, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (759, 20, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W12 塘沽调度车间 (org_unit_id=21)
+INSERT INTO `approval_permission` VALUES (760, 21, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (761, 21, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (762, 21, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (763, 21, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (764, 21, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W13 塘沽客运车间 (org_unit_id=22)
+INSERT INTO `approval_permission` VALUES (765, 22, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (766, 22, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (767, 22, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (768, 22, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (769, 22, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W14 信息化车间 (org_unit_id=23)
+INSERT INTO `approval_permission` VALUES (770, 23, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (771, 23, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (772, 23, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (773, 23, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (774, 23, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W15 安全生产指挥中心 (org_unit_id=24)
+INSERT INTO `approval_permission` VALUES (775, 24, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (776, 24, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (777, 24, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (778, 24, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (779, 24, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W16 经营开发部 (org_unit_id=25)
+INSERT INTO `approval_permission` VALUES (780, 25, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (781, 25, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (782, 25, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (783, 25, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (784, 25, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W17 车务设备维修站 (org_unit_id=26)
+INSERT INTO `approval_permission` VALUES (785, 26, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (786, 26, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (787, 26, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (788, 26, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (789, 26, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W18 张贵庄站 (org_unit_id=27)
+INSERT INTO `approval_permission` VALUES (790, 27, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (791, 27, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (792, 27, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (793, 27, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (794, 27, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W19 军粮城站 (org_unit_id=28)
+INSERT INTO `approval_permission` VALUES (795, 28, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (796, 28, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (797, 28, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (798, 28, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (799, 28, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+-- W20 北塘站 (org_unit_id=29)
+INSERT INTO `approval_permission` VALUES (800, 29, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'SECTION_LEVEL', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (801, 29, 'WORKSHOP_PARTY_SECRETARY', 'CADRE', 'GENERAL_CADRE', 'ALL', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (802, 29, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'PERSONAL', 30.01, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (803, 29, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'SICK', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+INSERT INTO `approval_permission` VALUES (804, 29, 'WORKSHOP_PARTY_SECRETARY', 'EMPLOYEE', 'STAFF', 'OTHER', NULL, NULL, 1, '2026-05-15 00:00:00', '2026-05-15 00:00:00');
+
+-- ----------------------------
 -- Table structure for approval_rule
 -- ----------------------------
 DROP TABLE IF EXISTS `approval_rule`;
@@ -1185,6 +1314,26 @@ INSERT INTO `user_account` VALUES (64, 'leader_07', '123456', 'DEPUTY_STATIONMAS
 INSERT INTO `user_account` VALUES (65, 'leader_08', '123456', 'DEPUTY_STATIONMASTER', '主管站长', '副站长6', NULL, NULL, NULL, 'CADRE', 'UNIT_DEPUTY', 'SUPERVISOR_LEADER', 1, 'ALL', 'ALL', 1, NULL, '2026-04-17 11:44:34', '2026-04-26 23:09:03', '/files/user-signatures/user_signature_user_65.png');
 INSERT INTO `user_account` VALUES (66, 'leader_09', '123456', 'DEPUTY_STATIONMASTER', '主管站长', '副站长7', NULL, NULL, NULL, 'CADRE', 'UNIT_DEPUTY', 'SUPERVISOR_LEADER', 1, 'ALL', 'ALL', 1, NULL, '2026-04-17 11:44:34', '2026-04-26 17:41:17', '/files/user-signatures/user_signature_0838e35bf1af463f9f36fc114472e611.png');
 INSERT INTO `user_account` VALUES (67, 'admin123', '$2a$10$hTakFxPGLgECl1T8kpIMe.oA7rs5D4fmuOlgoewlWlp5r8aX9cRcy', 'ATTENDANCE_ADMIN', NULL, '666', NULL, NULL, NULL, 'EMPLOYEE', 'STAFF', NULL, 6, 'SELF', 'NONE', 1, NULL, '2026-04-19 16:56:16', '2026-04-25 21:54:29', NULL);
+INSERT INTO `user_account` VALUES (68, 'W01_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '运转一车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 10, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (69, 'W02_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '运转二车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 11, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (70, 'W03_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '运转三车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 12, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (71, 'W04_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '运转四车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 13, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (72, 'W05_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '调度车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 14, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (73, 'W06_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '货检车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 15, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (74, 'W07_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '设备检修车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 16, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (75, 'W08_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '塘沽运转车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 17, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (76, 'W09_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '新港编组场车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 18, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (77, 'W10_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '新港一区运转车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 19, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (78, 'W11_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '新港二区运转车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 20, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (79, 'W12_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '塘沽调度车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 21, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (80, 'W13_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '塘沽客运车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 22, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (81, 'W14_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '信息化车间书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 23, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (82, 'W15_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '安全生产指挥中心书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 24, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (83, 'W16_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '经营开发部书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 25, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (84, 'W17_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '车务设备维修站书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 26, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (85, 'W18_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '张贵庄站书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 27, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (86, 'W19_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '军粮城站书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 28, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
+INSERT INTO `user_account` VALUES (87, 'W20_secretary', '123456', 'WORKSHOP_PARTY_SECRETARY', '车间书记', '北塘站书记', NULL, NULL, NULL, 'CADRE', 'SECTION_LEVEL', NULL, 29, 'ORG', 'ORG', 1, NULL, '2026-05-15 00:00:00', '2026-05-15 00:00:00', NULL);
 
 -- ----------------------------
 -- Table structure for user_message
@@ -1275,5 +1424,130 @@ INSERT INTO `user_message` VALUES (65, 1, 5, '测试消息', '物理', '2026-04-
 INSERT INTO `user_message` VALUES (66, 1, 4, '测试消息', '物理', '2026-04-26 19:59:57');
 INSERT INTO `user_message` VALUES (67, 1, 3, '测试消息', '物理', '2026-04-26 19:59:57');
 INSERT INTO `user_message` VALUES (68, 1, 2, '测试消息', '物理', '2026-04-26 19:59:57');
+
+-- ----------------------------
+-- Table structure for employee_basic (现员基础表)
+-- ----------------------------
+DROP TABLE IF EXISTS `employee_basic`;
+CREATE TABLE `employee_basic` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `id_card_no` varchar(18) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '身份证号',
+  `emp_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名',
+  `gender` varchar(10) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '性别',
+  `birth_date` date NULL DEFAULT NULL COMMENT '出生日期',
+  `work_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '工种',
+  `identity_type` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '身份',
+  `category_major` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '人员类别大类',
+  `category_minor` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '人员类别小类',
+  `age` int NULL DEFAULT NULL COMMENT '年龄',
+  `labor_shift` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '劳动班制',
+  `is_team_leader` tinyint NOT NULL DEFAULT 0 COMMENT '是否班组长: 0否 1是',
+  `org_unit_id` bigint NOT NULL COMMENT '科室车间ID',
+  `team_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '部门班组',
+  `is_active` tinyint NOT NULL DEFAULT 1 COMMENT '是否在职: 0否 1是',
+  `upload_batch` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '上传批次',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_id_card_no`(`id_card_no`) USING BTREE,
+  INDEX `idx_employee_org_unit_id`(`org_unit_id`) USING BTREE,
+  INDEX `idx_upload_batch`(`upload_batch`) USING BTREE,
+  CONSTRAINT `fk_employee_basic_org_unit` FOREIGN KEY (`org_unit_id`) REFERENCES `org_unit` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '现员基础表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for staff_ledger (现员台账)
+-- ----------------------------
+DROP TABLE IF EXISTS `staff_ledger`;
+CREATE TABLE `staff_ledger` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `org_unit_id` bigint NOT NULL COMMENT '车间ID',
+  `ledger_month` varchar(7) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '台账月份(YYYY-MM)',
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT' COMMENT '状态',
+  `in_work_count` int NULL DEFAULT NULL COMMENT '在岗人数',
+  `remark` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '备注',
+  `director_user_id` bigint NULL DEFAULT NULL COMMENT '审批主任ID',
+  `director_opinion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '主任审批意见',
+  `director_approved_at` datetime NULL DEFAULT NULL COMMENT '主任审批时间',
+  `hr_user_id` bigint NULL DEFAULT NULL COMMENT '审核人事科ID',
+  `hr_opinion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '人事科审核意见',
+  `hr_approved_at` datetime NULL DEFAULT NULL COMMENT '人事科审核时间',
+  `submitted_at` datetime NULL DEFAULT NULL COMMENT '提交时间',
+  `created_by` bigint NOT NULL COMMENT '创建人ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_org_month`(`org_unit_id`, `ledger_month`) USING BTREE,
+  INDEX `idx_ledger_status`(`status`) USING BTREE,
+  INDEX `idx_ledger_month`(`ledger_month`) USING BTREE,
+  CONSTRAINT `fk_staff_ledger_org_unit` FOREIGN KEY (`org_unit_id`) REFERENCES `org_unit` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '现员台账' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for staff_ledger_detail (台账明细)
+-- ----------------------------
+DROP TABLE IF EXISTS `staff_ledger_detail`;
+CREATE TABLE `staff_ledger_detail` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `ledger_id` bigint NOT NULL COMMENT '台账ID',
+  `employee_basic_id` bigint NOT NULL COMMENT '基础表ID',
+  `station_point` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '岗点',
+  `team_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班组名称',
+  `shift_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班制',
+  `is_team_leader` tinyint NOT NULL DEFAULT 0 COMMENT '是否班组长',
+  `is_non_working` tinyint NOT NULL DEFAULT 0 COMMENT '是否非在岗',
+  `non_working_reason` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '非在岗原因',
+  `sort_order` int NOT NULL DEFAULT 0 COMMENT '排序号',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_detail_ledger_id`(`ledger_id`) USING BTREE,
+  INDEX `idx_detail_employee_id`(`employee_basic_id`) USING BTREE,
+  CONSTRAINT `fk_detail_ledger` FOREIGN KEY (`ledger_id`) REFERENCES `staff_ledger` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT,
+  CONSTRAINT `fk_detail_employee` FOREIGN KEY (`employee_basic_id`) REFERENCES `employee_basic` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '台账明细' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for ledger_approval_record (台账审批记录)
+-- ----------------------------
+DROP TABLE IF EXISTS `ledger_approval_record`;
+CREATE TABLE `ledger_approval_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `ledger_id` bigint NOT NULL COMMENT '台账ID',
+  `step` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '审批步骤',
+  `action` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '操作',
+  `opinion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '审批意见',
+  `operator_user_id` bigint NOT NULL COMMENT '操作人ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  INDEX `idx_approval_ledger_id`(`ledger_id`) USING BTREE,
+  CONSTRAINT `fk_approval_ledger` FOREIGN KEY (`ledger_id`) REFERENCES `staff_ledger` (`id`) ON DELETE CASCADE ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '台账审批记录' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Table structure for ledger_config (台账配置)
+-- ----------------------------
+DROP TABLE IF EXISTS `ledger_config`;
+CREATE TABLE `ledger_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `config_key` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '配置键',
+  `config_value` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '配置值',
+  `description` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '说明',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_config_key`(`config_key`) USING BTREE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '台账配置' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of ledger_config
+-- ----------------------------
+INSERT INTO `ledger_config` (`config_key`, `config_value`, `description`) VALUES
+('team_leader_color', '#FFFFCC', '班组长背景颜色(浅黄色)'),
+('learner_color', '#CCFFCC', '学习人员背景颜色(浅绿色)'),
+('new_employee_color', '#FFCCCC', '新职人员背景颜色(浅红色)'),
+('show_team_leader_color', 'true', '是否显示班组长背景颜色'),
+('show_learner_color', 'true', '是否显示学习人员背景颜色'),
+('show_new_employee_color', 'true', '是否显示新职人员背景颜色'),
+('show_age', 'true', '是否显示年龄');
 
 SET FOREIGN_KEY_CHECKS = 1;

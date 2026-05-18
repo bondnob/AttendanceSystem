@@ -60,6 +60,15 @@ public interface UserAccountMapper {
             SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
                      applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
             FROM user_account
+            WHERE role_code = #{roleCode} AND is_enabled = 1
+            ORDER BY id ASC
+            """)
+    List<UserAccount> findEnabledByRole(@Param("roleCode") String roleCode);
+
+    @Select("""
+            SELECT id, username, password_hash, role_code, role_name, emp_name, id_card_no, team_name, work_type,
+                     applicant_type, position_level_code, leader_group_code, org_unit_id, data_scope, approval_scope, is_enabled, signature_url
+            FROM user_account
             WHERE leader_group_code = #{leaderGroupCode}
               AND is_enabled = 1
             ORDER BY id ASC

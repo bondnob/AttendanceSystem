@@ -108,7 +108,7 @@ public interface LeaveApprovalMapper {
               AND (
                     la.approver_user_id = #{userId}
                     OR (la.approver_user_id IS NULL AND la.approver_role_code = #{roleCode}
-                        AND (#{roleCode} <> 'ORG_PRINCIPAL' OR lr.org_unit_id = #{orgUnitId}))
+                        AND (#{roleCode} <> 'ORG_PRINCIPAL' AND #{roleCode} <> 'WORKSHOP_PARTY_SECRETARY' OR lr.org_unit_id = #{orgUnitId}))
                   )
             """)
     Long countPendingForUser(@Param("userId") Long userId,
@@ -125,7 +125,7 @@ public interface LeaveApprovalMapper {
               AND (
                     la.approver_user_id = #{userId}
                     OR (la.approver_user_id IS NULL AND la.approver_role_code = #{roleCode}
-                        AND (#{roleCode} <> 'ORG_PRINCIPAL' OR lr.org_unit_id = #{orgUnitId}))
+                        AND (#{roleCode} <> 'ORG_PRINCIPAL' AND #{roleCode} <> 'WORKSHOP_PARTY_SECRETARY' OR lr.org_unit_id = #{orgUnitId}))
                   )
             """)
     Long countMonthlyPendingForUser(@Param("userId") Long userId,
@@ -165,6 +165,14 @@ public interface LeaveApprovalMapper {
     int updateSignatureDate(@Param("leaveRequestId") Long leaveRequestId,
                             @Param("stepNo") Integer stepNo,
                             @Param("signatureDate") java.time.LocalDate signatureDate);
+
+    @Update("""
+            UPDATE leave_approval
+            SET step_no = #{stepNo},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateStepNo(@Param("id") Long id, @Param("stepNo") Integer stepNo);
 
     @Delete("""
             DELETE FROM leave_approval

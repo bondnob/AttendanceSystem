@@ -36,6 +36,7 @@ public class LeaveRequest {
     private String applicantSignatureUrl;
     private String applicantDateSignatureUrl;
     private String teamLeaderSignatureUrl;
+    private Integer partySecretaryFirst;
     private Long createdBy;
     private java.math.BigDecimal allowedDays;
     private Integer exceedsOneMonth;

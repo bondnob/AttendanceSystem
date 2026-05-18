@@ -50,6 +50,7 @@ public class AdminService {
     private static final String ORG_TYPE_WORKSHOP = "WORKSHOP";
     private static final Set<String> APPROVER_ROLE_CODES = Set.of(
             RoleCode.ORG_PRINCIPAL,
+            RoleCode.WORKSHOP_PARTY_SECRETARY,
             RoleCode.HR_SECTION_CHIEF,
             RoleCode.UNIT_DEPUTY_LEADER,
             RoleCode.UNIT_PRINCIPAL_LEADER,

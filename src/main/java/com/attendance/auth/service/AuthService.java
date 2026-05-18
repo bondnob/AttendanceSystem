@@ -97,7 +97,8 @@ public class AuthService {
                                                                        LocalDateTime monthStart,
                                                                        LocalDateTime monthEnd) {
         if (RoleCode.ATTENDANCE_ADMIN.equals(currentUser.getRoleCode())
-                || RoleCode.ORG_PRINCIPAL.equals(currentUser.getRoleCode())) {
+                || RoleCode.ORG_PRINCIPAL.equals(currentUser.getRoleCode())
+                || RoleCode.WORKSHOP_PARTY_SECRETARY.equals(currentUser.getRoleCode())) {
             Long pendingCount = leaveRequestMapper.countMonthlyRequestsByStatus(
                     monthStart, monthEnd, List.of(LeaveRequestStatus.PENDING), orgUnitId, applicantId);
             Long approvedCount = countApprovedOrRejectedByScope(monthStart, monthEnd, orgUnitId, applicantId);

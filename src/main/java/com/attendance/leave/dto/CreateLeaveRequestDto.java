@@ -44,4 +44,6 @@ public class CreateLeaveRequestDto {
 
     @NotNull(message = "申请时间不能为空")
     private LocalDateTime submittedAt;
+
+    private Boolean partySecretaryFirst;
 }

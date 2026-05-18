@@ -33,5 +33,6 @@ public class LeaveListItemResponse {
     private String currentApproverId;
     private String applicantSignatureUrl;
     private String teamLeaderSignatureUrl;
+    private Integer partySecretaryFirst;
     private List<ApprovalRecordResponse> approvals;
 }

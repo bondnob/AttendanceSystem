@@ -5,6 +5,9 @@ import com.attendance.admin.model.OrgUnit;
 import com.attendance.exception.BizException;
 import com.attendance.leave.dto.ApprovalRecordResponse;
 import com.attendance.leave.dto.LeaveDetailResponse;
+import com.attendance.leave.enums.RoleCode;
+import com.attendance.leave.mapper.UserAccountMapper;
+import com.attendance.leave.model.UserAccount;
 import com.lowagie.text.Document;
 import com.lowagie.text.DocumentException;
 import com.lowagie.text.Image;
@@ -46,6 +49,7 @@ public class LeaveDocumentService {
 
     private static final String APPLICANT_TYPE_EMPLOYEE = "EMPLOYEE";
     private static final String APPLICANT_TYPE_GENERAL_CADRE = "GENERAL_CADRE";
+    private static final String APPLICANT_TYPE_WORKSHOP_DIRECTOR = "WORKSHOP_DIRECTOR";
     private static final String POSITION_LEVEL_SECTION = "SECTION_LEVEL";
     private static final String HR_ORG_CODE = "D04";
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
@@ -65,6 +69,7 @@ public class LeaveDocumentService {
     private String fileStoragePath;
 
     private final OrgUnitMapper orgUnitMapper;
+    private final UserAccountMapper userAccountMapper;
 
     public String generatePdf(Long leaveId, LeaveDetailResponse detail) {
         if (detail.getFinalApprovedAt() == null) {
@@ -303,7 +308,15 @@ public class LeaveDocumentService {
     }
 
     private boolean usesEmployeePdfLayout(LeaveDetailResponse detail) {
+        // 车间主任请假时使用管理人员模板
+        if (APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(detail.getApplicantType())) {
+            return false;
+        }
         return APPLICANT_TYPE_EMPLOYEE.equals(detail.getApplicantType());
+    }
+
+    private boolean isWorkshopDirectorApplicant(LeaveDetailResponse detail) {
+        return APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(detail.getApplicantType());
     }
 
     private Path findProjectFile(String relativePath) {
@@ -565,6 +578,7 @@ public class LeaveDocumentService {
         } else {
             topRight = hrSectionChief;
         }
+        // 车间主任请假时，左下角显示站长签字
         ApprovalRecordResponse bottomLeft = stationmaster;
         slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true, null));
         slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, topRight, 410, 454, 478, 467, 505, true, null));
@@ -579,7 +593,8 @@ public class LeaveDocumentService {
     }
 
     private boolean isSectionLevel(LeaveDetailResponse detail) {
-        return POSITION_LEVEL_SECTION.equals(detail.getPositionLevelCode());
+        return POSITION_LEVEL_SECTION.equals(detail.getPositionLevelCode())
+                || APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(detail.getApplicantType());
     }
 
     private ApprovalRecordResponse resolveCadreTopLeftApproval(LeaveDetailResponse detail,

@@ -38,6 +38,7 @@ public class LeaveDetailResponse {
     private String applicantSignatureUrl;
     private String applicantDateSignatureUrl;
     private String teamLeaderSignatureUrl;
+    private Integer partySecretaryFirst;
     private String pdfUrl;
     private List<ApprovalRecordResponse> approvals;
 }

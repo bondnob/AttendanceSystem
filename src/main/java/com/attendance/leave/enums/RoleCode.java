@@ -4,6 +4,7 @@ public final class RoleCode {
 
     public static final String ATTENDANCE_ADMIN = "ATTENDANCE_ADMIN";
     public static final String ORG_PRINCIPAL = "ORG_PRINCIPAL";
+    public static final String WORKSHOP_PARTY_SECRETARY = "WORKSHOP_PARTY_SECRETARY";
     public static final String HR_SECTION_CHIEF = "HR_SECTION_CHIEF";
     public static final String UNIT_DEPUTY_LEADER = "UNIT_DEPUTY_LEADER";
     public static final String UNIT_PRINCIPAL_LEADER = "UNIT_PRINCIPAL_LEADER";
