@@ -1,6 +1,5 @@
 package com.attendance.ledger.dto;
 
-import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,7 +16,8 @@ public class LedgerDetailResponse {
     private String idCardNo;
     private String empName;
     private String gender;
-    private LocalDate birthDate;
+
+    private String birthDate;
     private Integer age;
     private String workType;
     private String identityType;
@@ -25,9 +25,10 @@ public class LedgerDetailResponse {
     private String categoryMinor;
     private String laborShift;
     private String teamName;
+    private String shiftCategory;
     private String stationPoint;
     private String shiftType;
-    private Integer isTeamLeader;
+    private String isTeamLeader;
     private Integer isNonWorking;
     private String nonWorkingReason;
     private Integer sortNo;

@@ -993,6 +993,7 @@ CREATE TABLE `leave_approval`  (
   `approval_status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING' COMMENT '审批状态',
   `approval_comment` varchar(1000) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '审批意见',
   `signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '电子签名地址',
+  `signature_date` datetime NULL DEFAULT NULL COMMENT '签字日期',
   `approved_at` datetime NULL DEFAULT NULL COMMENT '审批时间',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -1008,28 +1009,28 @@ CREATE TABLE `leave_approval`  (
 -- ----------------------------
 -- Records of leave_approval
 -- ----------------------------
-INSERT INTO `leave_approval` VALUES (11, 3, 28, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 19, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_19.png', '2026-04-27 10:33:08', '2026-04-27 10:09:55', '2026-04-27 10:33:07');
-INSERT INTO `leave_approval` VALUES (12, 3, 29, 2, 'APPROVE', '劳动人事科科长审批（电子签名）', 'HR_SECTION_CHIEF', 7, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_7.png', '2026-04-27 10:33:22', '2026-04-27 10:09:55', '2026-04-27 10:33:22');
-INSERT INTO `leave_approval` VALUES (13, 3, 30, 3, 'SELECT', '科室车间负责人选择副站长、站长、党委书记', 'ORG_PRINCIPAL', 19, 'APPROVED', '1', NULL, '2026-04-27 10:33:49', '2026-04-27 10:09:55', '2026-04-27 10:33:48');
-INSERT INTO `leave_approval` VALUES (14, 3, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
-INSERT INTO `leave_approval` VALUES (15, 3, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
-INSERT INTO `leave_approval` VALUES (16, 3, 43, 6, 'APPROVE', '党委书记审批（电子签名）', 'PARTY_SECRETARY', 60, 'PENDING', NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
-INSERT INTO `leave_approval` VALUES (17, 4, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 16:58:21', '2026-05-07 16:56:57', '2026-05-07 16:58:20');
-INSERT INTO `leave_approval` VALUES (18, 4, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, '2026-05-07 16:58:31', '2026-05-07 16:56:57', '2026-05-07 16:58:30');
-INSERT INTO `leave_approval` VALUES (19, 4, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 16:59:10', '2026-05-07 16:56:57', '2026-05-07 16:59:09');
-INSERT INTO `leave_approval` VALUES (20, 4, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, '2026-05-07 16:56:57', '2026-05-07 17:14:47');
-INSERT INTO `leave_approval` VALUES (21, 5, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 17:04:45', '2026-05-07 17:03:52', '2026-05-07 17:04:45');
-INSERT INTO `leave_approval` VALUES (22, 5, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '147', NULL, '2026-05-07 17:05:12', '2026-05-07 17:03:52', '2026-05-07 17:05:12');
-INSERT INTO `leave_approval` VALUES (23, 5, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 17:12:00', '2026-05-07 17:03:52', '2026-05-07 17:12:00');
-INSERT INTO `leave_approval` VALUES (24, 5, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_59.png', '2026-05-07 17:16:40', '2026-05-07 17:03:52', '2026-05-07 17:16:40');
-INSERT INTO `leave_approval` VALUES (29, 6, 5, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', '2026-05-07 17:17:33', '2026-05-07 17:17:11', '2026-05-07 17:17:32');
-INSERT INTO `leave_approval` VALUES (30, 6, 7, 3, 'SELECT', '科室车间负责人选择主管领导', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, '2026-05-07 17:17:42', '2026-05-07 17:17:11', '2026-05-07 17:17:42');
-INSERT INTO `leave_approval` VALUES (31, 6, 8, 4, 'APPROVE', '主管领导审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', '2026-05-07 17:18:01', '2026-05-07 17:17:11', '2026-05-07 17:18:01');
-INSERT INTO `leave_approval` VALUES (46, 9, 28, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 19, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_19.png', '2026-05-08 14:41:50', '2026-05-07 22:22:41', '2026-05-08 14:41:50');
-INSERT INTO `leave_approval` VALUES (47, 9, 29, 2, 'APPROVE', '劳动人事科科长审批（电子签名）', 'HR_SECTION_CHIEF', 7, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_7.png', '2026-05-08 14:43:11', '2026-05-07 22:22:41', '2026-05-08 14:43:11');
-INSERT INTO `leave_approval` VALUES (48, 9, 30, 3, 'SELECT', '科室车间负责人选择副站长、站长、党委书记', 'ORG_PRINCIPAL', 19, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
-INSERT INTO `leave_approval` VALUES (49, 9, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
-INSERT INTO `leave_approval` VALUES (50, 9, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (11, 3, 28, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 19, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_19.png', NULL, '2026-04-27 10:33:08', '2026-04-27 10:09:55', '2026-04-27 10:33:07');
+INSERT INTO `leave_approval` VALUES (12, 3, 29, 2, 'APPROVE', '劳动人事科科长审批（电子签名）', 'HR_SECTION_CHIEF', 7, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_7.png', NULL, '2026-04-27 10:33:22', '2026-04-27 10:09:55', '2026-04-27 10:33:22');
+INSERT INTO `leave_approval` VALUES (13, 3, 30, 3, 'SELECT', '科室车间负责人选择副站长、站长、党委书记', 'ORG_PRINCIPAL', 19, 'APPROVED', '1', NULL, NULL, '2026-04-27 10:33:49', '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_approval` VALUES (14, 3, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'PENDING', NULL, NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_approval` VALUES (15, 3, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_approval` VALUES (16, 3, 43, 6, 'APPROVE', '党委书记审批（电子签名）', 'PARTY_SECRETARY', 60, 'PENDING', NULL, NULL, NULL, NULL, '2026-04-27 10:09:55', '2026-04-27 10:33:48');
+INSERT INTO `leave_approval` VALUES (17, 4, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', NULL, '2026-05-07 16:58:21', '2026-05-07 16:56:57', '2026-05-07 16:58:20');
+INSERT INTO `leave_approval` VALUES (18, 4, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, NULL, '2026-05-07 16:58:31', '2026-05-07 16:56:57', '2026-05-07 16:58:30');
+INSERT INTO `leave_approval` VALUES (19, 4, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', NULL, '2026-05-07 16:59:10', '2026-05-07 16:56:57', '2026-05-07 16:59:09');
+INSERT INTO `leave_approval` VALUES (20, 4, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'PENDING', NULL, NULL, NULL, NULL, '2026-05-07 16:56:57', '2026-05-07 17:14:47');
+INSERT INTO `leave_approval` VALUES (21, 5, 9, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', NULL, '2026-05-07 17:04:45', '2026-05-07 17:03:52', '2026-05-07 17:04:45');
+INSERT INTO `leave_approval` VALUES (22, 5, 11, 3, 'SELECT', '科室车间负责人选择副站长和站长各1人', 'ORG_PRINCIPAL', 3, 'APPROVED', '147', NULL, NULL, '2026-05-07 17:05:12', '2026-05-07 17:03:52', '2026-05-07 17:05:12');
+INSERT INTO `leave_approval` VALUES (23, 5, 12, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', NULL, '2026-05-07 17:12:00', '2026-05-07 17:03:52', '2026-05-07 17:12:00');
+INSERT INTO `leave_approval` VALUES (24, 5, 42, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', 59, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_59.png', NULL, '2026-05-07 17:16:40', '2026-05-07 17:03:52', '2026-05-07 17:16:40');
+INSERT INTO `leave_approval` VALUES (29, 6, 5, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 3, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_3.png', NULL, '2026-05-07 17:17:33', '2026-05-07 17:17:11', '2026-05-07 17:17:32');
+INSERT INTO `leave_approval` VALUES (30, 6, 7, 3, 'SELECT', '科室车间负责人选择主管领导', 'ORG_PRINCIPAL', 3, 'APPROVED', '1', NULL, NULL, '2026-05-07 17:17:42', '2026-05-07 17:17:11', '2026-05-07 17:17:42');
+INSERT INTO `leave_approval` VALUES (31, 6, 8, 4, 'APPROVE', '主管领导审批（电子签名）', 'DEPUTY_STATIONMASTER', 58, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_58.png', NULL, '2026-05-07 17:18:01', '2026-05-07 17:17:11', '2026-05-07 17:18:01');
+INSERT INTO `leave_approval` VALUES (46, 9, 28, 1, 'APPROVE', '科室车间负责人审批（电子签名）', 'ORG_PRINCIPAL', 19, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_19.png', NULL, '2026-05-08 14:41:50', '2026-05-07 22:22:41', '2026-05-08 14:41:50');
+INSERT INTO `leave_approval` VALUES (47, 9, 29, 2, 'APPROVE', '劳动人事科科长审批（电子签名）', 'HR_SECTION_CHIEF', 7, 'APPROVED', '同意', '/files/user-signatures/user_signature_user_7.png', NULL, '2026-05-08 14:43:11', '2026-05-07 22:22:41', '2026-05-08 14:43:11');
+INSERT INTO `leave_approval` VALUES (48, 9, 30, 3, 'SELECT', '科室车间负责人选择副站长、站长、党委书记', 'ORG_PRINCIPAL', 19, 'PENDING', NULL, NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (49, 9, 31, 4, 'APPROVE', '副站长审批（电子签名）', 'DEPUTY_STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
+INSERT INTO `leave_approval` VALUES (50, 9, 32, 5, 'APPROVE', '站长审批（电子签名）', 'STATIONMASTER', NULL, 'PENDING', NULL, NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
 INSERT INTO `leave_approval` VALUES (51, 9, 43, 6, 'APPROVE', '党委书记审批（电子签名）', 'PARTY_SECRETARY', NULL, 'PENDING', NULL, NULL, NULL, '2026-05-07 22:22:41', '2026-05-07 22:22:41');
 
 -- ----------------------------
@@ -1069,6 +1070,7 @@ CREATE TABLE `leave_request`  (
   `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `applicant_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '请假人手写签名地址',
   `team_leader_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班组长手写签名地址',
+  `team_leader_signature_date` date NULL DEFAULT NULL COMMENT '班组长签名日期',
   `applicant_date_signature_url` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '请假人手写日期地址',
   PRIMARY KEY (`id`) USING BTREE,
   UNIQUE INDEX `uk_leave_request_request_no`(`request_no` ASC) USING BTREE,
@@ -1493,6 +1495,8 @@ CREATE TABLE `staff_ledger_detail` (
   `employee_basic_id` bigint NOT NULL COMMENT '基础表ID',
   `station_point` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '岗点',
   `team_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班组名称',
+  `shift_category` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班别（日勤/甲班/乙班/丙班/丁班/预备/其他）',
+  `work_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '岗位',
   `shift_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班制',
   `is_team_leader` tinyint NOT NULL DEFAULT 0 COMMENT '是否班组长',
   `is_non_working` tinyint NOT NULL DEFAULT 0 COMMENT '是否非在岗',
@@ -1549,5 +1553,101 @@ INSERT INTO `ledger_config` (`config_key`, `config_value`, `description`) VALUES
 ('show_learner_color', 'true', '是否显示学习人员背景颜色'),
 ('show_new_employee_color', 'true', '是否显示新职人员背景颜色'),
 ('show_age', 'true', '是否显示年龄');
+
+-- ----------------------------
+-- Table structure for team_name
+-- ----------------------------
+DROP TABLE IF EXISTS `team_name`;
+CREATE TABLE `team_name`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `org_unit_id` bigint NOT NULL COMMENT '所属部门ID',
+  `team_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '班组名称',
+  `shift_category` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '班别（日勤/甲班/乙班/丙班/丁班/预备/其他）',
+  `sort_no` int NULL DEFAULT 0 COMMENT '排序号',
+  `is_enabled` tinyint NOT NULL DEFAULT 1 COMMENT '是否启用',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_org_team`(`org_unit_id`, `team_name`) USING BTREE,
+  INDEX `idx_team_name_org_unit_id`(`org_unit_id`) USING BTREE,
+  CONSTRAINT `fk_team_name_org_unit` FOREIGN KEY (`org_unit_id`) REFERENCES `org_unit` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '班组名称字典表' ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of team_name (共220个班组，覆盖16个部门，含班别映射)
+-- ----------------------------
+-- 运转一车间 (id=10)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(10, '管理人员', '日勤', 1), (10, '专业技术组', '日勤', 2), (10, '运一甲上发', '甲班', 3), (10, '运一乙上发', '乙班', 4), (10, '运一丙上发', '丙班', 5), (10, '运一丁上发', '丁班', 6),
+(10, '运一甲一调', '甲班', 7), (10, '运一乙一调', '乙班', 8), (10, '运一丙一调', '丙班', 9), (10, '运一丁一调', '丁班', 10), (10, '运一预备', '预备', 11);
+-- 运转二车间 (id=11)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(11, '管理人员', '日勤', 1), (11, '专业技术组', '日勤', 2), (11, '运二甲上到', '甲班', 3), (11, '运二乙上到', '乙班', 4), (11, '运二丙上到', '丙班', 5), (11, '运二丁上到', '丁班', 6),
+(11, '运二甲驼调', '甲班', 7), (11, '运二乙驼调', '乙班', 8), (11, '运二丙驼调', '丙班', 9), (11, '运二丁驼调', '丁班', 10),
+(11, '运二甲七调', '甲班', 11), (11, '运二乙七调', '乙班', 12), (11, '运二丙七调', '丙班', 13), (11, '运二丁七调', '丁班', 14), (11, '运二预备', '预备', 15);
+-- 运转三车间 (id=12)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(12, '管理人员', '日勤', 1), (12, '专业技术组', '日勤', 2), (12, '运三甲下到', '甲班', 3), (12, '运三乙下到', '乙班', 4), (12, '运三丙下到', '丙班', 5), (12, '运三丁下到', '丁班', 6),
+(12, '运三甲驼调', '甲班', 7), (12, '运三乙驼调', '乙班', 8), (12, '运三丙驼调', '丙班', 9), (12, '运三丁驼调', '丁班', 10),
+(12, '运三甲六调', '甲班', 11), (12, '运三乙六调', '乙班', 12), (12, '运三丙六调', '丙班', 13), (12, '运三丁六调', '丁班', 14), (12, '运三预备', '预备', 15);
+-- 运转四车间 (id=13)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(13, '管理人员', '日勤', 1), (13, '专业技术组', '日勤', 2), (13, '运四甲直通', '甲班', 3), (13, '运四乙直通', '乙班', 4), (13, '运四丙直通', '丙班', 5), (13, '运四丁直通', '丁班', 6),
+(13, '运四甲南信', '甲班', 7), (13, '运四乙南信', '乙班', 8), (13, '运四丙南信', '丙班', 9), (13, '运四丁南信', '丁班', 10),
+(13, '运四甲五调', '甲班', 11), (13, '运四乙五调', '乙班', 12), (13, '运四丙五调', '丙班', 13), (13, '运四丁五调', '丁班', 14), (13, '运四预备', '预备', 15);
+-- 调度车间 (id=14)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(14, '管理人员', '日勤', 1), (14, '专业技术组', '日勤', 2), (14, '调度甲站调', '甲班', 3), (14, '调度乙站调', '乙班', 4), (14, '调度丙站调', '丙班', 5), (14, '调度丁站调', '丁班', 6),
+(14, '调度甲车号', '甲班', 7), (14, '调度乙车号', '乙班', 8), (14, '调度丙车号', '丙班', 9), (14, '调度丁车号', '丁班', 10), (14, '调度预备', '预备', 11);
+-- 货检车间 (id=15)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(15, '管理人员', '日勤', 1), (15, '专业技术组', '日勤', 2), (15, '货检甲上到', '甲班', 3), (15, '货检乙上到', '乙班', 4), (15, '货检丙上到', '丙班', 5), (15, '货检丁上到', '丁班', 6),
+(15, '货检甲上出发', '甲班', 7), (15, '货检乙上出发', '乙班', 8), (15, '货检丙上出发', '丙班', 9), (15, '货检丁上出发', '丁班', 10),
+(15, '货检甲下到', '甲班', 11), (15, '货检乙下到', '乙班', 12), (15, '货检丙下到', '丙班', 13), (15, '货检丁下到', '丁班', 14),
+(15, '货检甲下直编', '甲班', 15), (15, '货检乙下直编', '乙班', 16), (15, '货检丙下直编', '丙班', 17), (15, '货检丁下直编', '丁班', 18), (15, '货检预备', '预备', 19);
+-- 设备检修车间 (id=16)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(16, '管理人员', '日勤', 1), (16, '专业技术组', '日勤', 2), (16, '上行减速顶维修', '其他', 3), (16, '下行减速顶维修', '其他', 4), (16, '综合服务', '其他', 5), (16, '综合维修', '其他', 6),
+(16, '设备维修', '其他', 7), (16, '汽车库', '其他', 8), (16, '食堂', '其他', 9), (16, '绿化', '其他', 10), (16, '护路队', '其他', 11), (16, '基建', '其他', 12), (16, '后勤', '其他', 13);
+-- 塘沽运转车间 (id=17)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(17, '管理人员', '日勤', 1), (17, '专业技术组', '日勤', 2), (17, '塘运甲行车', '甲班', 3), (17, '塘运乙行车', '乙班', 4), (17, '塘运丙行车', '丙班', 5), (17, '塘运丁行车', '丁班', 6),
+(17, '塘运泰达行配甲班', '甲班', 7), (17, '塘运泰达行配乙班', '乙班', 8), (17, '塘运泰达行配丙班', '丙班', 9), (17, '塘运泰达行配丁班', '丁班', 10),
+(17, '甲一调', '甲班', 11), (17, '乙一调', '乙班', 12), (17, '丙一调', '丙班', 13), (17, '丁一调', '丁班', 14), (17, '塘运行车半', '其他', 15), (17, '塘运一调半', '其他', 16), (17, '塘运日勤', '日勤', 17);
+-- 新港编组场车间 (id=18)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(18, '管理人员', '日勤', 1), (18, '专业技术组', '日勤', 2), (18, '新编甲行配', '甲班', 3), (18, '新编乙行配', '乙班', 4), (18, '新编丙行配', '丙班', 5), (18, '新编丁行配', '丁班', 6),
+(18, '甲二调', '甲班', 7), (18, '乙二调', '乙班', 8), (18, '丙二调', '丙班', 9), (18, '丁二调', '丁班', 10),
+(18, '甲五调', '甲班', 11), (18, '乙五调', '乙班', 12), (18, '丙五调', '丙班', 13), (18, '丁五调', '丁班', 14),
+(18, '甲七调', '甲班', 15), (18, '乙七调', '乙班', 16), (18, '丙七调', '丙班', 17), (18, '丁七调', '丁班', 18),
+(18, '驼峰检修', '其他', 19), (18, '新编行配半班', '其他', 20), (18, '新编二调半', '其他', 21), (18, '新编五调半', '其他', 22), (18, '新编七调半', '其他', 23), (18, '新编半调', '其他', 24), (18, '新编日勤', '日勤', 25);
+-- 新港一区运转车间 (id=19)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(19, '管理人员', '日勤', 1), (19, '专业技术组', '日勤', 2), (19, '一区甲配扳', '甲班', 3), (19, '一区乙配扳', '乙班', 4), (19, '一区丙配扳', '丙班', 5), (19, '一区丁配扳', '丁班', 6),
+(19, '甲四调', '甲班', 7), (19, '乙四调', '乙班', 8), (19, '丙四调', '丙班', 9), (19, '丁四调', '丁班', 10), (19, '四调半', '其他', 11), (19, '一区日勤', '日勤', 12);
+-- 塘沽调度车间 (id=21)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(21, '管理人员', '日勤', 1), (21, '专业技术组', '日勤', 2), (21, '调度甲班', '甲班', 3), (21, '调度乙班', '乙班', 4), (21, '调度丙班', '丙班', 5), (21, '调度丁班', '丁班', 6), (21, '调度日勤', '日勤', 7);
+-- 塘沽客运车间 (id=22)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(22, '管理人员', '日勤', 1), (22, '专业技术组', '日勤', 2), (22, '客运甲班', '甲班', 3), (22, '客运乙班', '乙班', 4), (22, '客运丙班', '丙班', 5), (22, '客运票房', '其他', 6), (22, '客运日勤', '日勤', 7);
+-- 张贵庄站 (id=27)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(27, '管理人员', '日勤', 1), (27, '专业技术组', '日勤', 2), (27, '张贵庄行车甲班', '甲班', 3), (27, '张贵庄行车乙班', '乙班', 4), (27, '张贵庄行车丙班', '丙班', 5), (27, '张贵庄行车丁班', '丁班', 6),
+(27, '张贵庄调车甲班', '甲班', 7), (27, '张贵庄调车乙班', '乙班', 8), (27, '张贵庄调车丙班', '丙班', 9), (27, '张贵庄调车丁班', '丁班', 10), (27, '张贵庄综合班组', '其他', 11), (27, '张贵庄调车半班', '其他', 12);
+-- 军粮城站 (id=28)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(28, '管理人员', '日勤', 1), (28, '专业技术组', '日勤', 2), (28, '军粮城行配甲班', '甲班', 3), (28, '军粮城行配乙班', '乙班', 4), (28, '军粮城行配丙班', '丙班', 5), (28, '军粮城行配丁班', '丁班', 6),
+(28, '军粮城一调甲班', '甲班', 7), (28, '军粮城一调乙班', '乙班', 8), (28, '军粮城一调丙班', '丙班', 9), (28, '军粮城一调丁班', '丁班', 10),
+(28, '军粮城二调甲班', '甲班', 11), (28, '军粮城二调乙班', '乙班', 12), (28, '军粮城二调丙班', '丙班', 13), (28, '军粮城二调丁班', '丁班', 14),
+(28, '军粮城行配半班', '其他', 15), (28, '军粮城调车半班', '其他', 16), (28, '军粮城综合班组', '其他', 17);
+-- 北塘站 (id=29)
+INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+(29, '管理人员', '日勤', 1), (29, '专业技术组', '日勤', 2), (29, '北塘行车甲班', '甲班', 3), (29, '北塘行车乙班', '乙班', 4), (29, '北塘行车丙班', '丙班', 5), (29, '北塘行车丁班', '丁班', 6), (29, '北塘综合班组', '其他', 7);
+-- 新港三区运转车间（org_unit 表中暂无该部门，需先添加部门后再插入班组）
+-- INSERT INTO `team_name` (`org_unit_id`, `team_name`, `shift_category`, `sort_no`) VALUES
+-- (X, '管理人员', '日勤', 1), (X, '专业技术组', '日勤', 2), (X, '三区甲行配', '甲班', 3), (X, '三区乙行配', '乙班', 4), (X, '三区丙行配', '丙班', 5), (X, '三区丁行配', '丁班', 6),
+-- (X, '甲三调', '甲班', 7), (X, '乙三调', '乙班', 8), (X, '丙三调', '丙班', 9), (X, '丁三调', '丁班', 10),
+-- (X, '甲八调', '甲班', 11), (X, '乙八调', '乙班', 12), (X, '丙八调', '丙班', 13), (X, '丁八调', '丁班', 14), (X, '三区行配半班', '其他', 15), (X, '三调半', '其他', 16), (X, '八调半', '其他', 17);
 
 SET FOREIGN_KEY_CHECKS = 1;

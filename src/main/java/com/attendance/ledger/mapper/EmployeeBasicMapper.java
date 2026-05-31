@@ -62,7 +62,7 @@ public interface EmployeeBasicMapper {
                 created_at, updated_at
             FROM employee_basic
             WHERE org_unit_id = #{orgUnitId} AND is_distributed = 1
-            ORDER BY team_name, is_team_leader DESC, emp_name
+            ORDER BY id ASC
             """)
     List<EmployeeBasic> findDistributedByOrgUnitId(@Param("orgUnitId") Long orgUnitId);
 
@@ -116,7 +116,7 @@ public interface EmployeeBasicMapper {
                 created_at, updated_at
             FROM employee_basic
             WHERE org_unit_id = #{orgUnitId} AND is_distributed = 1
-            ORDER BY team_name, is_team_leader DESC, emp_name
+            ORDER BY id ASC
             LIMIT #{offset}, #{pageSize}
             """)
     List<EmployeeBasic> findDistributedByOrgUnitIdWithPage(@Param("orgUnitId") Long orgUnitId,
@@ -135,11 +135,47 @@ public interface EmployeeBasicMapper {
                 created_at, updated_at
             FROM employee_basic
             WHERE is_distributed = 1
-            ORDER BY org_unit_id, team_name, is_team_leader DESC, emp_name
+            ORDER BY id ASC
             LIMIT #{offset}, #{pageSize}
             """)
     List<EmployeeBasic> findAllDistributedWithPage(@Param("offset") int offset,
                                                    @Param("pageSize") int pageSize);
+
+    @Select("""
+            SELECT COUNT(1) FROM employee_basic WHERE org_unit_id = #{orgUnitId}
+            """)
+    Long countByOrgUnitId(@Param("orgUnitId") Long orgUnitId);
+
+    @Select("""
+            SELECT id, id_card_no, emp_name, gender, birth_date, age, work_type,
+                identity_type, category_major, category_minor, labor_shift, is_team_leader,
+                org_unit_id, team_name, is_active, upload_batch, is_distributed, distributed_at,
+                created_at, updated_at
+            FROM employee_basic
+            WHERE org_unit_id = #{orgUnitId}
+            ORDER BY id ASC
+            LIMIT #{offset}, #{pageSize}
+            """)
+    List<EmployeeBasic> findByOrgUnitIdWithPage(@Param("orgUnitId") Long orgUnitId,
+                                                @Param("offset") int offset,
+                                                @Param("pageSize") int pageSize);
+
+    @Select("""
+            SELECT COUNT(1) FROM employee_basic
+            """)
+    Long countAll();
+
+    @Select("""
+            SELECT id, id_card_no, emp_name, gender, birth_date, age, work_type,
+                identity_type, category_major, category_minor, labor_shift, is_team_leader,
+                org_unit_id, team_name, is_active, upload_batch, is_distributed, distributed_at,
+                created_at, updated_at
+            FROM employee_basic
+            ORDER BY id ASC
+            LIMIT #{offset}, #{pageSize}
+            """)
+    List<EmployeeBasic> findAllWithPage(@Param("offset") int offset,
+                                        @Param("pageSize") int pageSize);
 
     @Select("""
             <script>
@@ -157,7 +193,7 @@ public interface EmployeeBasicMapper {
             <if test="isDistributed != null">
                 AND is_distributed = #{isDistributed}
             </if>
-            ORDER BY org_unit_id, team_name, is_team_leader DESC, emp_name
+            ORDER BY id ASC
             </script>
             """)
     List<EmployeeBasic> findAll(@Param("orgUnitId") Long orgUnitId, @Param("isDistributed") Integer isDistributed);

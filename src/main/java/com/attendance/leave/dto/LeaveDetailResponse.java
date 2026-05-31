@@ -1,6 +1,7 @@
 package com.attendance.leave.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Builder;
@@ -38,6 +39,7 @@ public class LeaveDetailResponse {
     private String applicantSignatureUrl;
     private String applicantDateSignatureUrl;
     private String teamLeaderSignatureUrl;
+    private LocalDate teamLeaderSignatureDate;
     private Integer partySecretaryFirst;
     private String pdfUrl;
     private List<ApprovalRecordResponse> approvals;

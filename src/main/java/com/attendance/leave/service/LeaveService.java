@@ -136,7 +136,8 @@ public class LeaveService {
 
         String applicantType = normalizeApplicantType(dto.getApplicantType());
         BigDecimal allowedDays = leaveType.getDefaultDays() == null ? null : BigDecimal.valueOf(leaveType.getDefaultDays());
-        boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(30)) > 0;
+        int daysInMonth = dto.getStartTime().toLocalDate().lengthOfMonth();
+        boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(daysInMonth)) > 0;
         ApprovalRule rule = resolveApprovalRule(applicantType, applicant.getPositionLevelCode(), leaveType, dto.getLeaveDays(), exceedsOneMonth);
         String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
         validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
@@ -177,14 +178,19 @@ public class LeaveService {
 
         String firstApproverRoleCode = null;
         List<LeaveApproval> newApprovals = new ArrayList<>();
+        boolean hrInitiated = isHrOrgUnit(operator.getOrgUnitId());
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
             Long approverUserId = approver == null ? null : approver.getId();
             LeaveApproval approval = buildApproval(request.getId(), step, approverUserId);
+            if (hrInitiated && APPROVER_SOURCE_APPLICANT_ORG.equals(step.getApproverSource())
+                    && RoleCode.ORG_PRINCIPAL.equals(step.getApproverRoleCode())) {
+                approval.setApproverRoleCode(RoleCode.HR_SECTION_CHIEF);
+            }
             leaveApprovalMapper.insert(approval);
             newApprovals.add(approval);
             if (firstApproverRoleCode == null) {
-                firstApproverRoleCode = step.getApproverRoleCode();
+                firstApproverRoleCode = approval.getApproverRoleCode();
             }
         }
         swapApprovalStepNoIfNeeded(request, newApprovals);
@@ -207,7 +213,8 @@ public class LeaveService {
 
         String applicantType = normalizeApplicantType(dto.getApplicantType());
         BigDecimal allowedDays = leaveType.getDefaultDays() == null ? null : BigDecimal.valueOf(leaveType.getDefaultDays());
-        boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(30)) > 0;
+        int daysInMonth = dto.getStartTime().toLocalDate().lengthOfMonth();
+        boolean exceedsOneMonth = dto.getLeaveDays() != null && dto.getLeaveDays().compareTo(BigDecimal.valueOf(daysInMonth)) > 0;
         ApprovalRule rule = resolveApprovalRule(applicantType, applicant.getPositionLevelCode(), leaveType, dto.getLeaveDays(), exceedsOneMonth);
         String applicantNameSnapshot = resolveApplicantNameSnapshot(applicantType, applicant, dto);
         validateLeaveRequestRules(applicantNameSnapshot, leaveType, dto);
@@ -247,14 +254,19 @@ public class LeaveService {
         leaveApprovalMapper.deleteByLeaveRequestId(leaveId);
         String firstApproverRoleCode = null;
         List<LeaveApproval> newApprovals = new ArrayList<>();
+        boolean hrInitiated = isHrOrgUnit(operator.getOrgUnitId());
         for (ApprovalRuleStep step : steps) {
             UserAccount approver = resolveInitialApprover(applicant.getOrgUnitId(), step);
             Long approverUserId = approver == null ? null : approver.getId();
             LeaveApproval approval = buildApproval(request.getId(), step, approverUserId);
+            if (hrInitiated && APPROVER_SOURCE_APPLICANT_ORG.equals(step.getApproverSource())
+                    && RoleCode.ORG_PRINCIPAL.equals(step.getApproverRoleCode())) {
+                approval.setApproverRoleCode(RoleCode.HR_SECTION_CHIEF);
+            }
             leaveApprovalMapper.insert(approval);
             newApprovals.add(approval);
             if (firstApproverRoleCode == null) {
-                firstApproverRoleCode = step.getApproverRoleCode();
+                firstApproverRoleCode = approval.getApproverRoleCode();
             }
         }
         swapApprovalStepNoIfNeeded(request, newApprovals);
@@ -278,7 +290,11 @@ public class LeaveService {
     @Transactional
     public LeaveDetailResponse approve(Long leaveId, ApproveLeaveWithSignatureDto dto) {
         UserAccount operator = requireCurrentUser();
-        return approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(), dto.getSignatureFile(), dto.getSignatureUrl(), null, dto.getSignatureDate());
+        java.time.LocalDate effectiveSignatureDate = dto.getSignatureDate();
+        if (effectiveSignatureDate == null && dto.getApprovedAt() != null) {
+            effectiveSignatureDate = dto.getApprovedAt().toLocalDate();
+        }
+        return approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(), dto.getSignatureFile(), dto.getSignatureUrl(), null, effectiveSignatureDate, dto.getApprovedAt());
     }
 
     @Transactional
@@ -295,10 +311,15 @@ public class LeaveService {
             }
         }
 
+        java.time.LocalDate effectiveSignatureDate = dto.getSignatureDate();
+        if (effectiveSignatureDate == null && dto.getApprovedAt() != null) {
+            effectiveSignatureDate = dto.getApprovedAt().toLocalDate();
+        }
+
         List<LeaveDetailResponse> records = new ArrayList<>();
         for (Long leaveId : dto.getLeaveIds()) {
             records.add(approveInternal(operator, leaveId, dto.getApproved(), dto.getComment(),
-                    null, dto.getSignatureUrl(), signatureBytes == null ? null : new BatchSignaturePayload(signatureBytes, originalFilename), dto.getSignatureDate()));
+                    null, dto.getSignatureUrl(), signatureBytes == null ? null : new BatchSignaturePayload(signatureBytes, originalFilename), effectiveSignatureDate, dto.getApprovedAt()));
         }
         return BatchApproveLeaveResponse.builder()
                 .approvedCount(records.size())
@@ -340,8 +361,8 @@ public class LeaveService {
     public LeaveDetailResponse uploadHandwrittenSignature(Long leaveId, HandwrittenSignatureDto dto) {
         LeaveRequest request = requireLeaveRequest(leaveId);
         String type = dto.getApplicantType().trim().toUpperCase();
-        if (!"APPLICANT".equals(type) && !"TEAM_LEADER".equals(type)) {
-            throw new BizException("签名类型只能是 APPLICANT或 TEAM_LEADER，分别为请假人姓名、班组长姓名");
+        if (!"APPLICANT".equals(type) && !"TEAM_LEADER".equals(type) && !"APPLICANT_DATE".equals(type)) {
+            throw new BizException("签名类型只能是 APPLICANT、TEAM_LEADER 或 APPLICANT_DATE，分别为请假人姓名、班组长姓名、请假人日期");
         }
 
         if (dto.getSignatureFile() == null || dto.getSignatureFile().isEmpty()) {
@@ -353,14 +374,25 @@ public class LeaveService {
             if ("APPLICANT".equals(type)) {
                 leaveRequestMapper.updateApplicantSignatureUrl(leaveId, url);
                 request.setApplicantSignatureUrl(url);
+            } else if ("APPLICANT_DATE".equals(type)) {
+                leaveRequestMapper.updateApplicantDateSignatureUrl(leaveId, url);
+                request.setApplicantDateSignatureUrl(url);
             } else {
-                leaveRequestMapper.updateTeamLeaderSignatureUrl(leaveId, url);
+                leaveRequestMapper.updateTeamLeaderSignatureUrlOnly(leaveId, url);
                 request.setTeamLeaderSignatureUrl(url);
             }
             return getLeaveDetail(leaveId);
         } catch (IOException ex) {
             throw new BizException("手写签名上传失败");
         }
+    }
+
+    @Transactional
+    public LeaveDetailResponse uploadTeamLeaderSignatureDate(Long leaveId, LocalDate signatureDate) {
+        LeaveRequest request = requireLeaveRequest(leaveId);
+        leaveRequestMapper.updateTeamLeaderSignatureDate(leaveId, signatureDate);
+        request.setTeamLeaderSignatureDate(signatureDate);
+        return getLeaveDetail(leaveId);
     }
 
     private String saveHandwrittenSignatureFile(Long leaveId, String type, String originalName, java.io.InputStream inputStream) throws IOException {
@@ -418,7 +450,7 @@ public class LeaveService {
 
         List<UserAccount> selectedUsers = validateAndResolveSelectedApprovers(request, pending, currentRuleStep, dto.getApproverUserIds());
 
-        decideApproval(pending, operator.getId(), true, dto.getComment(), null, null);
+        decideApproval(pending, operator.getId(), true, dto.getComment(), null, null, null);
 
         List<LeaveApproval> targets = resolveOrCreateSelectedApprovalTargets(request, currentRuleStep, selectedUsers);
 
@@ -680,6 +712,7 @@ public class LeaveService {
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .teamLeaderSignatureDate(request.getTeamLeaderSignatureDate())
                 .partySecretaryFirst(request.getPartySecretaryFirst())
                 .pdfUrl(pdfUrl)
                 .approvals(approvals)
@@ -880,6 +913,7 @@ public class LeaveService {
             );
         }
         return List.of(
+                LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.PENDING).name("待审批").build(),
                 LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.APPROVING).name("审批中").build(),
                 LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.APPROVED).name("已通过").build(),
                 LeaveStatusOptionResponse.builder().code(LeaveRequestStatus.REJECTED).name("已驳回").build()
@@ -996,7 +1030,7 @@ public class LeaveService {
     private LeaveDetailResponse approveInternal(UserAccount operator, Long leaveId, Boolean approved, String comment,
                                                 org.springframework.web.multipart.MultipartFile signatureFile,
                                                 String signatureUrl, BatchSignaturePayload batchSignaturePayload,
-                                                java.time.LocalDate signatureDate) {
+                                                java.time.LocalDate signatureDate, LocalDateTime approvedAt) {
         LeaveRequest request = requireLeaveRequest(leaveId);
         ensureNotCancelled(request);
         LeaveApproval pending = requireCurrentPendingApproval(request);
@@ -1018,7 +1052,7 @@ public class LeaveService {
             }
         }
 
-        decideApproval(pending, operator.getId(), approved, comment, finalSignatureUrl, signatureDate);
+        decideApproval(pending, operator.getId(), approved, comment, finalSignatureUrl, signatureDate, approvedAt);
 
         if (Boolean.FALSE.equals(approved)) {
             request.setStatus(LeaveRequestStatus.REJECTED);
@@ -1056,10 +1090,11 @@ public class LeaveService {
         }
 
         if (RoleCode.ORG_PRINCIPAL.equals(operator.getRoleCode())
-                || RoleCode.WORKSHOP_PARTY_SECRETARY.equals(operator.getRoleCode())) {
+                || RoleCode.WORKSHOP_PARTY_SECRETARY.equals(operator.getRoleCode())
+                || RoleCode.HR_SECTION_CHIEF.equals(operator.getRoleCode())) {
             if (!List.of(LeaveRequestStatus.PENDING, LeaveRequestStatus.APPROVING,
                     LeaveRequestStatus.APPROVED, LeaveRequestStatus.REJECTED).contains(status)) {
-                throw new BizException("科室车间负责人仅可查询待审批、审批中、已通过、已驳回状态");
+                throw new BizException("当前角色仅可查询待审批、审批中、已通过、已驳回状态");
             }
             return status;
         }
@@ -1213,14 +1248,17 @@ public class LeaveService {
             return;
         }
 
-        if (leaveDays.compareTo(DAY_30) >= 0 && leaveDays.compareTo(DAY_60) > 0) {
+        java.time.LocalDate startDate = dto.getStartTime().toLocalDate();
+        int daysInMonth = startDate.lengthOfMonth();
+        BigDecimal monthThreshold = BigDecimal.valueOf(daysInMonth);
+
+        if (leaveDays.compareTo(monthThreshold) >= 0 && leaveDays.compareTo(DAY_60) > 0) {
             throw new BizException("特殊情况单次事假原则上不得超过2个月");
         }
 
-        java.time.LocalDate startDate = dto.getStartTime().toLocalDate();
         java.time.LocalDate endDate = dto.getEndTime().toLocalDate();
         java.time.LocalDate monthStart = startDate.withDayOfMonth(1);
-        java.time.LocalDate monthEnd = startDate.withDayOfMonth(startDate.lengthOfMonth());
+        java.time.LocalDate monthEnd = startDate.withDayOfMonth(daysInMonth);
         java.time.LocalDate quarterStart = startDate.withMonth(firstMonthOfQuarter(startDate.getMonth()).getValue()).withDayOfMonth(1);
         java.time.LocalDate quarterEnd = quarterStart.plusMonths(2).withDayOfMonth(quarterStart.plusMonths(2).lengthOfMonth());
         java.time.LocalDate yearStart = startDate.withDayOfYear(1);
@@ -1255,18 +1293,18 @@ public class LeaveService {
             return;
         }
 
-        if (leaveDays.compareTo(DAY_10) >= 0 && leaveDays.compareTo(DAY_30) < 0) {
-            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_10, BigDecimal.valueOf(29.99));
+        if (leaveDays.compareTo(DAY_10) >= 0 && leaveDays.compareTo(monthThreshold) < 0) {
+            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_10, monthThreshold.subtract(BigDecimal.ONE));
             if (yearlyCount >= 3) {
-                throw new BizException("单次请事假10天及以上至30天以内的年度内不得超过3次");
+                throw new BizException("单次请事假10天及以上至" + daysInMonth + "天以内的年度内不得超过3次");
             }
             return;
         }
 
-        if (leaveDays.compareTo(DAY_30) >= 0) {
-            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, DAY_30, null);
+        if (leaveDays.compareTo(monthThreshold) >= 0) {
+            long yearlyCount = countPersonalLeave(applicantNameSnapshot, yearStart, yearEnd, monthThreshold, null);
             if (yearlyCount >= 2) {
-                throw new BizException("单次请事假30天及以上的年度内不得超过2次");
+                throw new BizException("单次请事假" + daysInMonth + "天及以上的年度内不得超过2次");
             }
         }
     }
@@ -1359,7 +1397,7 @@ public class LeaveService {
 
     private boolean shouldSkipHrApproval(UserAccount operator, String applicantType, LeaveType leaveType) {
         if ((APPLICANT_TYPE_GENERAL_CADRE.equals(applicantType) || APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(applicantType) || APPLICANT_TYPE_WORKSHOP_DIRECTOR.equals(applicantType))
-                && isHrAttendanceAdmin(operator)) {
+                && isHrOrgUnit(operator.getOrgUnitId())) {
             return true;
         }
         if (leaveType == null || leaveType.getLeaveCode() == null) {
@@ -1601,9 +1639,11 @@ public class LeaveService {
         if (leaveDays == null) {
             return SelectionScenario.NONE;
         }
+        int daysInMonth = request.getStartDate() != null ? request.getStartDate().lengthOfMonth() : 30;
+        BigDecimal monthThreshold = BigDecimal.valueOf(daysInMonth);
 
         if (LEAVE_SCOPE_SICK.equals(leaveScope)) {
-            if (leaveDays.compareTo(DAY_30) > 0) {
+            if (leaveDays.compareTo(monthThreshold) > 0) {
                 return SelectionScenario.SICK_OVER_MONTH;
             }
             if (leaveDays.compareTo(DAY_7) > 0) {
@@ -1612,7 +1652,7 @@ public class LeaveService {
         }
 
         if (LEAVE_SCOPE_PERSONAL.equals(leaveScope)) {
-            if (leaveDays.compareTo(DAY_30) > 0) {
+            if (leaveDays.compareTo(monthThreshold) > 0) {
                 return SelectionScenario.PERSONAL_OVER_30;
             }
             if (leaveDays.compareTo(DAY_5) > 0 && leaveDays.compareTo(DAY_10) <= 0) {
@@ -1703,13 +1743,14 @@ public class LeaveService {
     }
 
     private boolean canApproveSectionLevelSickOverMonth(ApprovalPermission permission, LeaveRequest request, String leaveScope) {
+        int daysInMonth = request.getStartDate() != null ? request.getStartDate().lengthOfMonth() : 30;
         return (RoleCode.STATIONMASTER.equals(permission.getRoleCode())
                 || RoleCode.PARTY_SECRETARY.equals(permission.getRoleCode()))
                 && APPLICANT_TYPE_SECTION_LEVEL_CADRE.equals(request.getApplicantType())
                 && POSITION_SECTION_LEVEL.equals(request.getPositionLevelCode())
                 && LEAVE_SCOPE_SICK.equals(leaveScope)
                 && request.getLeaveDays() != null
-                && request.getLeaveDays().compareTo(DAY_30) > 0;
+                && request.getLeaveDays().compareTo(BigDecimal.valueOf(daysInMonth)) > 0;
     }
 
     private String resolveRuleApplicantType(String applicantType, String leaveScope) {
@@ -1731,13 +1772,13 @@ public class LeaveService {
         return resolvePositionLevel(applicantType, actualPositionLevel);
     }
 
-    private void decideApproval(LeaveApproval approval, Long approverUserId, Boolean approved, String comment, String signatureUrl, java.time.LocalDate signatureDate) {
+    private void decideApproval(LeaveApproval approval, Long approverUserId, Boolean approved, String comment, String signatureUrl, java.time.LocalDate signatureDate, LocalDateTime approvedAt) {
         approval.setApproverUserId(approverUserId);
         approval.setApprovalStatus(Boolean.TRUE.equals(approved) ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED);
         approval.setApprovalComment(comment);
         approval.setSignatureUrl(normalizeSignatureUrl(signatureUrl));
         approval.setSignatureDate(signatureDate != null ? signatureDate : java.time.LocalDate.now());
-        approval.setApprovedAt(LocalDateTime.now());
+        approval.setApprovedAt(approvedAt != null ? approvedAt : LocalDateTime.now());
         leaveApprovalMapper.updateDecision(approval);
     }
 
@@ -1856,6 +1897,7 @@ public class LeaveService {
                 .applicantSignatureUrl(request.getApplicantSignatureUrl())
                 .applicantDateSignatureUrl(request.getApplicantDateSignatureUrl())
                 .teamLeaderSignatureUrl(request.getTeamLeaderSignatureUrl())
+                .teamLeaderSignatureDate(request.getTeamLeaderSignatureDate())
                 .partySecretaryFirst(request.getPartySecretaryFirst())
                 .approvals(approvals)
                 .build();

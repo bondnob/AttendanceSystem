@@ -1,14 +1,17 @@
 package com.attendance.admin.controller;
 
 import com.attendance.admin.dto.CreateOrgUnitRequest;
+import com.attendance.admin.dto.CreateTeamNameRequest;
 import com.attendance.admin.dto.CreateUserRequest;
 import com.attendance.admin.dto.OrgUnitResponse;
 import com.attendance.admin.dto.ResetPasswordRequest;
 import com.attendance.admin.dto.SendUserMessageRequest;
 import com.attendance.admin.dto.SaveLeaveSignRequirementRequest;
 import com.attendance.admin.dto.SaveApprovalPermissionRequest;
+import com.attendance.admin.dto.TeamNameResponse;
 import com.attendance.admin.dto.UpdateEnabledRequest;
 import com.attendance.admin.dto.UpdateOrgUnitRequest;
+import com.attendance.admin.dto.UpdateTeamNameRequest;
 import com.attendance.admin.dto.UpdateUserSignatureRequest;
 import com.attendance.admin.dto.UpdateUserRequest;
 import com.attendance.admin.dto.UserSummaryResponse;
@@ -143,6 +146,42 @@ public class AdminController {
     public ApiResponse<Void> sendUserMessage(@Valid @RequestBody SendUserMessageRequest request) {
         adminService.sendUserMessage(request);
         return ApiResponse.success("信息提示发送成功", null);
+    }
+
+    @Operation(summary = "按部门获取班组名称列表", description = "获取指定部门下所有启用的班组名称，用于下拉选择。")
+    @GetMapping("/team-names")
+    public ApiResponse<List<TeamNameResponse>> listTeamNamesByOrgUnit(@RequestParam Long orgUnitId) {
+        return ApiResponse.success(adminService.listTeamNamesByOrgUnit(orgUnitId));
+    }
+
+    @Operation(summary = "班组名称分页列表", description = "分页查询班组名称，支持按部门和名称筛选。不传分页参数则返回全部。")
+    @GetMapping("/team-names/page")
+    public ApiResponse<PageResponse<TeamNameResponse>> listTeamNames(
+            @RequestParam(required = false) Long orgUnitId,
+            @RequestParam(required = false) String teamName,
+            @RequestParam(required = false) Integer pageNum,
+            @RequestParam(required = false) Integer pageSize) {
+        return ApiResponse.success(adminService.listTeamNames(orgUnitId, teamName, pageNum, pageSize));
+    }
+
+    @Operation(summary = "新增班组名称")
+    @PostMapping("/team-names")
+    public ApiResponse<TeamNameResponse> createTeamName(@Valid @RequestBody CreateTeamNameRequest request) {
+        return ApiResponse.success("班组名称创建成功", adminService.createTeamName(request));
+    }
+
+    @Operation(summary = "编辑班组名称")
+    @PutMapping("/team-names/{id}")
+    public ApiResponse<TeamNameResponse> updateTeamName(@PathVariable Long id,
+                                                         @Valid @RequestBody UpdateTeamNameRequest request) {
+        return ApiResponse.success("班组名称更新成功", adminService.updateTeamName(id, request));
+    }
+
+    @Operation(summary = "删除班组名称")
+    @DeleteMapping("/team-names/{id}")
+    public ApiResponse<Void> deleteTeamName(@PathVariable Long id) {
+        adminService.deleteTeamName(id);
+        return ApiResponse.success("班组名称删除成功", null);
     }
 
     @Operation(summary = "所有请假记录", description = "超级管理员查看所有请假记录列表，支持按状态、假别和申请人姓名筛选。")

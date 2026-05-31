@@ -1,6 +1,5 @@
 package com.attendance.ledger.dto;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,14 +16,14 @@ public class EmployeeBasicResponse {
     private String idCardNo;
     private String empName;
     private String gender;
-    private LocalDate birthDate;
+    private String birthDate;
     private Integer age;
     private String workType;
     private String identityType;
     private String categoryMajor;
     private String categoryMinor;
     private String laborShift;
-    private Integer isTeamLeader;
+    private String isTeamLeader;
     private Long orgUnitId;
     private String orgUnitName;
     private String teamName;

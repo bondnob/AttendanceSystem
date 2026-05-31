@@ -14,6 +14,7 @@ import com.attendance.leave.dto.HandwrittenSignatureDto;
 import com.attendance.leave.dto.LeaveDetailResponse;
 import com.attendance.leave.dto.UpdateLeaveSubmittedTimeDto;
 import com.attendance.leave.dto.UpdateSignatureDateDto;
+import com.attendance.leave.dto.TeamLeaderSignatureDateDto;
 import com.attendance.leave.dto.LeaveListItemResponse;
 import com.attendance.leave.dto.LeavePdfResponse;
 import com.attendance.leave.dto.LeaveStatusOptionResponse;
@@ -86,6 +87,13 @@ public class LeaveController {
     public ApiResponse<LeaveDetailResponse> uploadHandwrittenSignature(@PathVariable Long leaveId,
                                                                         @Valid @ModelAttribute HandwrittenSignatureDto request) {
         return ApiResponse.success("手写签名上传成功", leaveService.uploadHandwrittenSignature(leaveId, request));
+    }
+
+    @Operation(summary = "班组长上传签字日期", description = "班组长单独上传手写签字日期。")
+    @PostMapping("/{leaveId}/team-leader-signature-date")
+    public ApiResponse<LeaveDetailResponse> uploadTeamLeaderSignatureDate(@PathVariable Long leaveId,
+                                                                           @Valid @RequestBody TeamLeaderSignatureDateDto request) {
+        return ApiResponse.success("班组长签字日期上传成功", leaveService.uploadTeamLeaderSignatureDate(leaveId, request.getSignatureDate()));
     }
 
     @Operation(summary = "修改请假单申请时间", description = "超级管理员修改指定请假单的申请时间。")

@@ -546,13 +546,20 @@ public class LeaveDocumentService {
                 slots.add(new ApprovalSlot(67, 541, 295, 463, "", null, orgPrincipal, 176, 220, 244, 467, 505, true, null));
                 slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 467, 505, true, null));
             } else {
-                // 班组长：姓名用手写签名图片，日期保持电子打印
-                slots.add(new ApprovalSlot(67, 541, 295, 463, "", detail.getSubmittedAt(), null, 176, 220, 244, 467, 505, false, detail.getTeamLeaderSignatureUrl()));
+                // 班组长：姓名用手写签名图片，日期使用班组长上传签名时传入的日期
+                java.time.LocalDateTime teamLeaderDate = detail.getTeamLeaderSignatureDate() != null
+                        ? detail.getTeamLeaderSignatureDate().atStartOfDay()
+                        : detail.getSubmittedAt();
+                slots.add(new ApprovalSlot(67, 541, 295, 463, "", teamLeaderDate, null, 176, 220, 244, 467, 505, false, detail.getTeamLeaderSignatureUrl()));
                 slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true, null));
             }
             if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
                 slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true, null));
                 slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426, true, null));
+            } else if (isPersonalLeaveOver30Days(detail)) {
+                ApprovalRecordResponse stationmasterApproval = findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长");
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmasterApproval, 176, 220, 244, 388, 426, true, null));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记"), 410, 454, 478, 388, 426, true, null));
             } else {
                 slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true, null));
                 slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findLastLeaderApproval(approvals), 410, 454, 478, 388, 426, true, null));
@@ -561,11 +568,18 @@ public class LeaveDocumentService {
         }
         ApprovalRecordResponse hrSectionChiefApproval = findApprovalByRole(approvals, "HR_SECTION_CHIEF");
         ApprovalRecordResponse orgPrincipal = resolveCadreTopLeftApproval(detail, approvals, hrSectionChiefApproval);
+        // 车间主任请假时，左上角显示车间书记
+        if (isWorkshopDirectorApplicant(detail)) {
+            ApprovalRecordResponse workshopPartySecretary = findApprovalByRoleOrName(approvals, "WORKSHOP_PARTY_SECRETARY", "车间书记");
+            if (workshopPartySecretary != null) {
+                orgPrincipal = workshopPartySecretary;
+            }
+        }
         ApprovalRecordResponse hrSectionChief = isGeneralCadre(detail)
                 ? null
                 : hrSectionChiefApproval;
         ApprovalRecordResponse stationmaster = findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长");
-        ApprovalRecordResponse partySecretary = isGeneralCadre(detail)
+        ApprovalRecordResponse partySecretary = isGeneralCadre(detail) && !isPersonalLeaveOver30Days(detail)
                 ? null
                 : findApprovalByRoleOrName(approvals, "PARTY_SECRETARY", "党委书记");
         ApprovalRecordResponse deputyStationmaster = findApprovalByRoleOrName(approvals, "DEPUTY_STATIONMASTER", "副站长");
@@ -600,14 +614,14 @@ public class LeaveDocumentService {
     private ApprovalRecordResponse resolveCadreTopLeftApproval(LeaveDetailResponse detail,
                                                                List<ApprovalRecordResponse> approvals,
                                                                ApprovalRecordResponse hrSectionChiefApproval) {
-        if (isHrGeneralCadreLeave(detail) && hrSectionChiefApproval != null) {
+        if (isHrCadreLeave(detail) && hrSectionChiefApproval != null) {
             return hrSectionChiefApproval;
         }
         return findApprovalByRole(approvals, "ORG_PRINCIPAL");
     }
 
-    private boolean isHrGeneralCadreLeave(LeaveDetailResponse detail) {
-        return isGeneralCadre(detail) && isHrOrgUnit(detail.getOrgUnitId());
+    private boolean isHrCadreLeave(LeaveDetailResponse detail) {
+        return (isGeneralCadre(detail) || isSectionLevel(detail)) && isHrOrgUnit(detail.getOrgUnitId());
     }
 
     private boolean isHrOrgUnit(Long orgUnitId) {
@@ -649,11 +663,11 @@ public class LeaveDocumentService {
     }
 
     private boolean isSickLeaveOver30Days(LeaveDetailResponse detail) {
-        return isLeaveType(detail, "病") && isGreaterThan(detail.getLeaveDays(), DAY_30);
+        return isLeaveType(detail, "病") && isGreaterThan(detail.getLeaveDays(), getMonthThreshold(detail));
     }
 
     private boolean isPersonalLeaveOver30Days(LeaveDetailResponse detail) {
-        return isLeaveType(detail, "事") && isGreaterThan(detail.getLeaveDays(), DAY_30);
+        return isLeaveType(detail, "事") && isGreaterThan(detail.getLeaveDays(), getMonthThreshold(detail));
     }
 
     private boolean isPersonalLeaveOver10AndWithin30Days(LeaveDetailResponse detail) {
@@ -661,7 +675,14 @@ public class LeaveDocumentService {
         return isLeaveType(detail, "事")
                 && leaveDays != null
                 && leaveDays.compareTo(DAY_10) > 0
-                && leaveDays.compareTo(DAY_30) <= 0;
+                && leaveDays.compareTo(getMonthThreshold(detail)) <= 0;
+    }
+
+    private BigDecimal getMonthThreshold(LeaveDetailResponse detail) {
+        if (detail.getStartTime() != null) {
+            return BigDecimal.valueOf(detail.getStartTime().toLocalDate().lengthOfMonth());
+        }
+        return DAY_30;
     }
 
     private boolean isLeaveType(LeaveDetailResponse detail, String leaveTypeKeyword) {

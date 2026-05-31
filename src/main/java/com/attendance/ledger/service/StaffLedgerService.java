@@ -1,7 +1,9 @@
 package com.attendance.ledger.service;
 
 import com.attendance.admin.mapper.OrgUnitMapper;
+import com.attendance.admin.mapper.TeamNameMapper;
 import com.attendance.admin.model.OrgUnit;
+import com.attendance.admin.model.TeamName;
 import com.attendance.auth.security.CurrentUser;
 import com.attendance.auth.security.UserContext;
 import com.attendance.common.PageResponse;
@@ -19,11 +21,13 @@ import com.attendance.ledger.dto.SaveLedgerDetailRequest;
 import com.attendance.ledger.dto.SaveLedgerRequest;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
 import com.attendance.ledger.mapper.EmployeeBasicMapper;
+import com.attendance.ledger.mapper.EmployeeBasicSubmissionMapper;
 import com.attendance.ledger.mapper.LedgerApprovalRecordMapper;
 import com.attendance.ledger.mapper.LedgerConfigMapper;
 import com.attendance.ledger.mapper.StaffLedgerDetailMapper;
 import com.attendance.ledger.mapper.StaffLedgerMapper;
 import com.attendance.ledger.model.EmployeeBasic;
+import com.attendance.ledger.model.EmployeeBasicSubmission;
 import com.attendance.ledger.model.LedgerApprovalRecord;
 import com.attendance.ledger.model.LedgerConfig;
 import com.attendance.ledger.model.StaffLedger;
@@ -37,6 +41,7 @@ import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -44,7 +49,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
-import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
@@ -72,11 +76,13 @@ public class StaffLedgerService {
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final EmployeeBasicMapper employeeBasicMapper;
+    private final EmployeeBasicSubmissionMapper employeeBasicSubmissionMapper;
     private final StaffLedgerMapper staffLedgerMapper;
     private final StaffLedgerDetailMapper staffLedgerDetailMapper;
     private final LedgerApprovalRecordMapper ledgerApprovalRecordMapper;
     private final LedgerConfigMapper ledgerConfigMapper;
     private final OrgUnitMapper orgUnitMapper;
+    private final TeamNameMapper teamNameMapper;
     private final UserAccountMapper userAccountMapper;
 
     // ==================== 现员基础表相关 ====================
@@ -97,19 +103,17 @@ public class StaffLedgerService {
 
             int imported = 0, updated = 0, skipped = 0;
             List<String> errors = new ArrayList<>();
+            List<Map<String, Object>> unmatchedRecords = new ArrayList<>();
 
             for (int i = 1; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
 
                 String idCardNo = getCellStringValue(row, 0);
-                if (idCardNo == null || idCardNo.isBlank()) {
-                    skipped++; log.warn("Row {}: 身份证号为空，跳过", i); continue;
-                }
 
                 String empName = getCellStringValue(row, 1);
                 String gender = getCellStringValue(row, 2);
-                LocalDate birthDate = getCellDateValue(row, 3);
+                String birthDate = getCellStringValue(row, 3);
                 String workType = getCellStringValue(row, 4);
                 String identityType = getCellStringValue(row, 5);
                 String categoryMajor = getCellStringValue(row, 6);
@@ -120,28 +124,50 @@ public class StaffLedgerService {
                 String orgName = getCellStringValue(row, 11);
                 String teamName = getCellStringValue(row, 12);
 
-                if (age == null && birthDate != null) age = LocalDate.now().getYear() - birthDate.getYear();
+                if (age == null && birthDate != null && !birthDate.isBlank()) {
+                    try {
+                        String yearStr = birthDate.length() >= 4 ? birthDate.substring(0, 4) : null;
+                        if (yearStr != null) age = LocalDate.now().getYear() - Integer.parseInt(yearStr);
+                    } catch (NumberFormatException ignored) {}
+                }
 
                 // 根据科室车间名称获取orgUnitId：先精确匹配，再模糊匹配
                 Long orgUnitId = resolveOrgUnitId(orgName, exactNameMap, allOrgUnits);
+
+                // 班组长：正班组长、副班组长、不是班组长
+                String isTeamLeader = "否";
+                if (teamLeaderStr != null) {
+                    String trimmed = teamLeaderStr.trim();
+                    if ("正班组长".equals(trimmed) || "正".equals(trimmed)) {
+                        isTeamLeader = "正班组长";
+                    } else if ("副班组长".equals(trimmed) || "副".equals(trimmed)) {
+                        isTeamLeader = "副班组长";
+                    } else if ("是".equals(trimmed) || "1".equals(trimmed) || "班组长".equals(trimmed)) {
+                        isTeamLeader = "正班组长";  // 兼容旧数据
+                    }
+                }
+
+                // org_unit_id 为 NOT NULL 且有外键约束，匹配不到时记录到未匹配列表
                 if (orgUnitId == null) {
-                    errors.add("第" + (i + 1) + "行：科室车间「" + orgName + "」在系统中不存在");
+                    Map<String, Object> unmatched = new HashMap<>();
+                    unmatched.put("row", i + 1);
+                    unmatched.put("idCardNo", idCardNo);
+                    unmatched.put("empName", empName);
+                    unmatched.put("orgName", orgName);
+                    unmatchedRecords.add(unmatched);
                     skipped++;
                     continue;
                 }
 
-                int isTeamLeader = "是".equals(teamLeaderStr) || "1".equals(teamLeaderStr) ? 1 : 0;
-
-                EmployeeBasic existing = employeeBasicMapper.findByIdCardNo(idCardNo);
+                EmployeeBasic existing = idCardNo != null && !idCardNo.isBlank() ? employeeBasicMapper.findByIdCardNo(idCardNo) : null;
                 if (existing != null) {
                     existing.setEmpName(empName); existing.setGender(gender); existing.setBirthDate(birthDate);
+
                     existing.setWorkType(workType); existing.setIdentityType(identityType);
                     existing.setCategoryMajor(categoryMajor); existing.setCategoryMinor(categoryMinor);
                     existing.setAge(age); existing.setLaborShift(laborShift); existing.setIsTeamLeader(isTeamLeader);
                     existing.setOrgUnitId(orgUnitId); existing.setTeamName(teamName); existing.setIsActive(1);
                     existing.setUploadBatch(uploadBatch);
-                    existing.setIsDistributed(1);
-                    existing.setDistributedAt(LocalDateTime.now());
                     employeeBasicMapper.updateByIdCardNo(existing);
                     updated++;
                 } else {
@@ -152,14 +178,12 @@ public class StaffLedgerService {
                     emp.setAge(age); emp.setLaborShift(laborShift); emp.setIsTeamLeader(isTeamLeader);
                     emp.setOrgUnitId(orgUnitId); emp.setTeamName(teamName); emp.setIsActive(1);
                     emp.setUploadBatch(uploadBatch);
-                    emp.setIsDistributed(1);
-                    emp.setDistributedAt(LocalDateTime.now());
                     employeeBasicMapper.insert(emp);
                     imported++;
                 }
             }
 
-            if (imported == 0 && updated == 0) {
+            if (imported == 0 && updated == 0 && unmatchedRecords.isEmpty()) {
                 String detail = errors.isEmpty() ? "Excel文件中没有有效数据" : String.join("；", errors);
                 throw new BizException("导入失败：" + detail);
             }
@@ -168,6 +192,10 @@ public class StaffLedgerService {
             result.put("uploadBatch", uploadBatch);
             result.put("imported", imported); result.put("updated", updated); result.put("skipped", skipped);
             if (!errors.isEmpty()) result.put("errors", errors);
+            if (!unmatchedRecords.isEmpty()) {
+                result.put("unmatchedCount", unmatchedRecords.size());
+                result.put("unmatchedRecords", unmatchedRecords);
+            }
             return result;
         } catch (BizException e) { throw e; } catch (Exception e) { throw new BizException("Excel导入失败: " + e.getMessage()); }
     }
@@ -183,20 +211,22 @@ public class StaffLedgerService {
         }
     }
 
-    public PageResponse<EmployeeBasicResponse> getMyEmployeeBasic(Integer pageNum, Integer pageSize) {
+    public PageResponse<EmployeeBasicResponse> getMyEmployeeBasic(Long orgUnitId, Integer pageNum, Integer pageSize) {
         CurrentUser currentUser = requireLogin();
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
-        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 500);
         int offset = (safePageNum - 1) * safePageSize;
+
+        Long queryOrgId = orgUnitId != null ? orgUnitId : currentUser.getOrgUnitId();
 
         long total;
         List<EmployeeBasic> list;
-        if (isSystemAdmin(currentUser)) {
-            total = employeeBasicMapper.countAllDistributed();
-            list = employeeBasicMapper.findAllDistributedWithPage(offset, safePageSize);
+        if (isSystemAdmin(currentUser) && orgUnitId == null) {
+            total = employeeBasicMapper.countAll();
+            list = employeeBasicMapper.findAllWithPage(offset, safePageSize);
         } else {
-            total = employeeBasicMapper.countDistributedByOrgUnitId(currentUser.getOrgUnitId());
-            list = employeeBasicMapper.findDistributedByOrgUnitIdWithPage(currentUser.getOrgUnitId(), offset, safePageSize);
+            total = employeeBasicMapper.countByOrgUnitId(queryOrgId);
+            list = employeeBasicMapper.findByOrgUnitIdWithPage(queryOrgId, offset, safePageSize);
         }
 
         List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
@@ -239,6 +269,13 @@ public class StaffLedgerService {
         }
 
         staffLedgerDetailMapper.deleteByLedgerId(ledger.getId());
+        ledgerApprovalRecordMapper.deleteByLedgerId(ledger.getId());
+        ledger.setStatus(STATUS_DRAFT);
+        ledger.setDirectorUserId(null); ledger.setDirectorOpinion(null); ledger.setDirectorApprovedAt(null);
+        ledger.setHrUserId(null); ledger.setHrOpinion(null); ledger.setHrApprovedAt(null);
+        ledger.setSubmittedAt(null);
+        ledger.setInWorkCount(null); ledger.setRemark(null); ledger.setChangeDescription(null);
+        staffLedgerMapper.resetForSync(ledger);
 
         List<EmployeeBasic> employees = employeeBasicMapper.findDistributedByOrgUnitId(orgUnitId);
         List<StaffLedgerDetail> details = new ArrayList<>();
@@ -247,6 +284,13 @@ public class StaffLedgerService {
             StaffLedgerDetail detail = new StaffLedgerDetail();
             detail.setLedgerId(ledger.getId());
             detail.setEmployeeBasicId(emp.getId());
+            detail.setTeamName(emp.getTeamName());
+            detail.setWorkType(emp.getWorkType());
+            // 根据班组名称查找班别
+            if (emp.getTeamName() != null && !emp.getTeamName().isBlank()) {
+                TeamName tn = teamNameMapper.findByOrgUnitIdAndTeamName(orgUnitId, emp.getTeamName());
+                detail.setShiftCategory(tn != null ? tn.getShiftCategory() : null);
+            }
             detail.setSortNo(sortNo++);
             details.add(detail);
         }
@@ -296,6 +340,9 @@ public class StaffLedgerService {
             StaffLedgerDetail detail = staffLedgerDetailMapper.findById(detailReq.getId());
             if (detail == null || !detail.getLedgerId().equals(ledgerId)) throw new BizException("明细记录不存在");
             detail.setStationPoint(detailReq.getStationPoint());
+            detail.setTeamName(detailReq.getTeamName());
+            detail.setShiftCategory(detailReq.getShiftCategory());
+            detail.setWorkType(detailReq.getWorkType());
             detail.setSortNo(detailReq.getSortNo());
             staffLedgerDetailMapper.update(detail);
         }
@@ -321,6 +368,73 @@ public class StaffLedgerService {
         staffLedgerMapper.updateSubmitted(ledger);
         saveApprovalRecord(ledgerId, STEP_DIRECTOR, "SUBMIT", null, currentUser.getUserId());
         return buildLedgerResponse(ledger);
+    }
+
+    @Transactional
+    public LedgerResponse submitLedgerToHr(String month) {
+        CurrentUser currentUser = requireLogin();
+        String effectiveMonth = month != null ? month : LocalDate.now().format(MONTH_FMT);
+        StaffLedger ledger = staffLedgerMapper.findByOrgUnitAndMonth(currentUser.getOrgUnitId(), effectiveMonth);
+        if (ledger == null) throw new BizException("当前部门本月台账不存在，请先同步");
+        if (!STATUS_DRAFT.equals(ledger.getStatus()) && !STATUS_RETURNED.equals(ledger.getStatus()))
+            throw new BizException("当前状态不允许提交");
+
+        ledger.setStatus(STATUS_DIRECTOR_APPROVED);
+        ledger.setSubmittedAt(LocalDateTime.now());
+        staffLedgerMapper.updateSubmitted(ledger);
+        saveApprovalRecord(ledger.getId(), STEP_DIRECTOR, ACTION_APPROVE, "考勤管理员直接提交至人事科", currentUser.getUserId());
+        return buildLedgerResponse(ledger);
+    }
+
+    @Transactional
+    public void submitBasicTable() {
+        CurrentUser currentUser = requireLogin();
+        Long orgUnitId = currentUser.getOrgUnitId();
+
+        long count = employeeBasicMapper.countByOrgUnitId(orgUnitId);
+        if (count == 0) throw new BizException("当前部门没有现员基础表数据");
+
+        EmployeeBasicSubmission submission = new EmployeeBasicSubmission();
+        submission.setOrgUnitId(orgUnitId);
+        submission.setStatus("SUBMITTED");
+        submission.setSubmittedBy(currentUser.getUserId());
+        submission.setSubmittedAt(LocalDateTime.now());
+        employeeBasicSubmissionMapper.insert(submission);
+    }
+
+    public PageResponse<Map<String, Object>> getBasicTableSubmissions(String status, Integer pageNum, Integer pageSize) {
+        requireLogin();
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+
+        List<OrgUnit> allOrg = orgUnitMapper.findAll();
+        List<Map<String, Object>> all = allOrg.stream().map(org -> {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("orgUnitId", org.getId());
+            item.put("orgUnitName", org.getOrgName());
+            EmployeeBasicSubmission sub = employeeBasicSubmissionMapper.findLatestByOrgUnitId(org.getId());
+            item.put("status", sub != null ? sub.getStatus() : "NOT_SUBMITTED");
+            item.put("submittedAt", sub != null ? sub.getSubmittedAt() : null);
+            long employeeCount = employeeBasicMapper.countByOrgUnitId(org.getId());
+            item.put("employeeCount", employeeCount);
+            return item;
+        }).collect(Collectors.toList());
+
+        if (status != null && !status.isBlank()) {
+            String upper = status.trim().toUpperCase();
+            all = all.stream()
+                    .filter(item -> upper.equals(item.get("status")))
+                    .collect(Collectors.toList());
+        }
+
+        long total = all.size();
+        int fromIndex = (safePageNum - 1) * safePageSize;
+        int toIndex = Math.min(fromIndex + safePageSize, all.size());
+        List<Map<String, Object>> records = fromIndex < all.size() ? all.subList(fromIndex, toIndex) : List.of();
+
+        return PageResponse.<Map<String, Object>>builder()
+                .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records)
+                .build();
     }
 
     @Transactional
@@ -354,11 +468,14 @@ public class StaffLedgerService {
         return buildLedgerResponse(ledger);
     }
 
-    public List<LedgerPendingResponse> getPendingLedgers(String status) {
+    public PageResponse<LedgerPendingResponse> getPendingLedgers(String status, Integer pageNum, Integer pageSize) {
         requireLogin();
-        String effectiveStatus = status != null ? status : STATUS_SUBMITTED;
-        List<StaffLedger> ledgers = staffLedgerMapper.findByStatus(effectiveStatus);
-        return ledgers.stream().map(l -> {
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePageNum - 1) * safePageSize;
+        Long total = staffLedgerMapper.countByCondition(status);
+        List<StaffLedger> ledgers = staffLedgerMapper.findPageByCondition(status, offset, safePageSize);
+        List<LedgerPendingResponse> records = ledgers.stream().map(l -> {
             OrgUnit org = orgUnitMapper.findById(l.getOrgUnitId());
             UserAccount creator = userAccountMapper.findById(l.getCreatedBy());
             return LedgerPendingResponse.builder()
@@ -370,6 +487,12 @@ public class StaffLedgerService {
                     .submittedAt(l.getSubmittedAt()).updatedAt(l.getUpdatedAt())
                     .build();
         }).collect(Collectors.toList());
+        return PageResponse.<LedgerPendingResponse>builder()
+                .total(total == null ? 0L : total)
+                .pageNum(safePageNum)
+                .pageSize(safePageSize)
+                .records(records)
+                .build();
     }
 
     public PageResponse<LedgerPendingResponse> getAllLedgers(String status, String month, Integer pageNum, Integer pageSize) {
@@ -484,10 +607,13 @@ public class StaffLedgerService {
             LedgerDetailResponse resp = LedgerDetailResponse.builder()
                     .id(detail.getId()).employeeBasicId(detail.getEmployeeBasicId())
                     .idCardNo(emp.getIdCardNo()).empName(emp.getEmpName()).gender(emp.getGender())
-                    .birthDate(emp.getBirthDate()).age(emp.getAge()).workType(emp.getWorkType())
+                    .birthDate(emp.getBirthDate()).age(emp.getAge())
+                    .workType(detail.getWorkType() != null ? detail.getWorkType() : emp.getWorkType())
                     .identityType(emp.getIdentityType()).categoryMajor(emp.getCategoryMajor())
                     .categoryMinor(emp.getCategoryMinor()).laborShift(emp.getLaborShift())
-                    .teamName(emp.getTeamName()).stationPoint(detail.getStationPoint())
+                    .teamName(detail.getTeamName() != null ? detail.getTeamName() : emp.getTeamName())
+                    .shiftCategory(detail.getShiftCategory())
+                    .stationPoint(detail.getStationPoint())
                     .shiftType(emp.getLaborShift()).isTeamLeader(emp.getIsTeamLeader())
                     .isNonWorking(emp.getIsActive() == 0 ? 1 : 0)
                     .nonWorkingReason(emp.getIsActive() == 0 ? emp.getCategoryMajor() : null)
@@ -570,14 +696,6 @@ public class StaffLedgerService {
         if (cell == null) return null;
         if (cell.getCellType() == CellType.STRING) return cell.getStringCellValue().trim();
         if (cell.getCellType() == CellType.NUMERIC) return String.valueOf((long) cell.getNumericCellValue());
-        return null;
-    }
-
-    private LocalDate getCellDateValue(Row row, int col) {
-        Cell cell = row.getCell(col);
-        if (cell == null) return null;
-        if (cell.getCellType() == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)) return cell.getLocalDateTimeCellValue().toLocalDate();
-        if (cell.getCellType() == CellType.STRING) { try { return LocalDate.parse(cell.getStringCellValue().trim()); } catch (Exception e) { return null; } }
         return null;
     }
 

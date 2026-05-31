@@ -1,23 +1,28 @@
 package com.attendance.admin.service;
 
 import com.attendance.admin.dto.CreateOrgUnitRequest;
+import com.attendance.admin.dto.CreateTeamNameRequest;
 import com.attendance.admin.dto.CreateUserRequest;
 import com.attendance.admin.dto.OrgUnitResponse;
 import com.attendance.admin.dto.ResetPasswordRequest;
 import com.attendance.admin.dto.SendUserMessageRequest;
 import com.attendance.admin.dto.SaveLeaveSignRequirementRequest;
 import com.attendance.admin.dto.SaveApprovalPermissionRequest;
+import com.attendance.admin.dto.TeamNameResponse;
 import com.attendance.admin.dto.UpdateEnabledRequest;
 import com.attendance.admin.dto.UpdateOrgUnitRequest;
+import com.attendance.admin.dto.UpdateTeamNameRequest;
 import com.attendance.admin.dto.UpdateUserSignatureRequest;
 import com.attendance.admin.dto.UpdateUserRequest;
 import com.attendance.admin.dto.UserSummaryResponse;
 import com.attendance.admin.mapper.ApprovalPermissionMapper;
 import com.attendance.admin.mapper.LeaveSignRequirementMapper;
 import com.attendance.admin.mapper.OrgUnitMapper;
+import com.attendance.admin.mapper.TeamNameMapper;
 import com.attendance.admin.model.ApprovalPermission;
 import com.attendance.admin.model.LeaveSignRequirement;
 import com.attendance.admin.model.OrgUnit;
+import com.attendance.admin.model.TeamName;
 import com.attendance.auth.mapper.UserMessageMapper;
 import com.attendance.auth.model.UserMessage;
 import com.attendance.auth.security.CurrentUser;
@@ -64,6 +69,7 @@ public class AdminService {
     private final ApprovalPermissionMapper approvalPermissionMapper;
     private final LeaveSignRequirementMapper leaveSignRequirementMapper;
     private final UserMessageMapper userMessageMapper;
+    private final TeamNameMapper teamNameMapper;
 
     @Value("${attendance.file-storage-path:uploads}")
     private String fileStoragePath;
@@ -284,6 +290,123 @@ public class AdminService {
     public List<LeaveSignRequirement> listLeaveSignRequirements() {
         requireSystemAdmin();
         return leaveSignRequirementMapper.findAll();
+    }
+
+    public List<TeamNameResponse> listTeamNamesByOrgUnit(Long orgUnitId) {
+        return teamNameMapper.findByOrgUnitId(orgUnitId).stream()
+                .map(this::toTeamNameResponse)
+                .collect(Collectors.toList());
+    }
+
+    public PageResponse<TeamNameResponse> listTeamNames(Long orgUnitId, String teamName, Integer pageNum, Integer pageSize) {
+        String keyword = normalizeKeyword(teamName);
+        Long total = teamNameMapper.countByCondition(orgUnitId, keyword);
+        // 不传分页参数则返回全部
+        if (pageNum == null && pageSize == null) {
+            List<TeamNameResponse> data = teamNameMapper.findPageByCondition(orgUnitId, keyword, 0, Integer.MAX_VALUE).stream()
+                    .map(this::toTeamNameResponse)
+                    .collect(Collectors.toList());
+            return PageResponse.<TeamNameResponse>builder()
+                    .total(total == null ? 0L : total)
+                    .pageNum(1)
+                    .pageSize(data.size())
+                    .records(data)
+                    .build();
+        }
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+        int offset = (safePageNum - 1) * safePageSize;
+        List<TeamNameResponse> data = teamNameMapper.findPageByCondition(orgUnitId, keyword, offset, safePageSize).stream()
+                .map(this::toTeamNameResponse)
+                .collect(Collectors.toList());
+        return PageResponse.<TeamNameResponse>builder()
+                .total(total == null ? 0L : total)
+                .pageNum(safePageNum)
+                .pageSize(safePageSize)
+                .records(data)
+                .build();
+    }
+
+    @Transactional
+    public TeamNameResponse createTeamName(CreateTeamNameRequest request) {
+        requireSystemAdmin();
+        requireOrgUnit(request.getOrgUnitId());
+        String name = request.getTeamName().trim();
+        if (teamNameMapper.findByOrgUnitIdAndTeamName(request.getOrgUnitId(), name) != null) {
+            throw new BizException("该部门下已存在同名班组");
+        }
+        TeamName teamName = new TeamName();
+        teamName.setOrgUnitId(request.getOrgUnitId());
+        teamName.setTeamName(name);
+        teamName.setShiftCategory(request.getShiftCategory());
+        teamName.setSortNo(request.getSortNo() != null ? request.getSortNo() : generateTeamNameSortNo(request.getOrgUnitId()));
+        teamName.setIsEnabled(1);
+        teamNameMapper.insert(teamName);
+        return toTeamNameResponse(teamName);
+    }
+
+    @Transactional
+    public TeamNameResponse updateTeamName(Long id, UpdateTeamNameRequest request) {
+        requireSystemAdmin();
+        TeamName teamName = requireTeamName(id);
+        requireOrgUnit(request.getOrgUnitId());
+        String name = request.getTeamName().trim();
+        TeamName existing = teamNameMapper.findByOrgUnitIdAndTeamName(request.getOrgUnitId(), name);
+        if (existing != null && !existing.getId().equals(id)) {
+            throw new BizException("该部门下已存在同名班组");
+        }
+        teamName.setOrgUnitId(request.getOrgUnitId());
+        teamName.setTeamName(name);
+        if (request.getShiftCategory() != null) {
+            teamName.setShiftCategory(request.getShiftCategory());
+        }
+        if (request.getSortNo() != null) {
+            teamName.setSortNo(request.getSortNo());
+        }
+        if (request.getIsEnabled() != null) {
+            teamName.setIsEnabled(request.getIsEnabled());
+        }
+        teamNameMapper.update(teamName);
+        return toTeamNameResponse(teamName);
+    }
+
+    @Transactional
+    public void deleteTeamName(Long id) {
+        requireSystemAdmin();
+        requireTeamName(id);
+        teamNameMapper.deleteById(id);
+    }
+
+    private TeamName requireTeamName(Long id) {
+        TeamName teamName = teamNameMapper.findById(id);
+        if (teamName == null) {
+            throw new BizException("班组名称不存在");
+        }
+        return teamName;
+    }
+
+    private Integer generateTeamNameSortNo(Long orgUnitId) {
+        Integer maxSortNo = teamNameMapper.findMaxSortNoByOrgUnitId(orgUnitId);
+        return maxSortNo == null ? 1 : maxSortNo + 1;
+    }
+
+    private TeamNameResponse toTeamNameResponse(TeamName teamName) {
+        String orgUnitName = null;
+        OrgUnit orgUnit = orgUnitMapper.findById(teamName.getOrgUnitId());
+        if (orgUnit != null) {
+            orgUnitName = orgUnit.getOrgName();
+        }
+        return TeamNameResponse.builder()
+                .id(teamName.getId())
+                .orgUnitId(teamName.getOrgUnitId())
+                .orgUnitName(orgUnitName)
+                .teamName(teamName.getTeamName())
+                .shiftCategory(teamName.getShiftCategory())
+                .sortNo(teamName.getSortNo())
+                .isEnabled(teamName.getIsEnabled())
+                .createdAt(teamName.getCreatedAt())
+                .updatedAt(teamName.getUpdatedAt())
+                .build();
     }
 
     @Transactional

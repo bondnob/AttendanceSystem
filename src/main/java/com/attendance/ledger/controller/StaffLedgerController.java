@@ -63,12 +63,13 @@ public class StaffLedgerController {
         return ApiResponse.success("下发成功", null);
     }
 
-    @Operation(summary = "获取本部门现员基础表", description = "考勤管理员获取本部门已下发的现员基础表，超级管理员返回全部。")
+    @Operation(summary = "获取本部门现员基础表", description = "考勤管理员获取本部门已下发的现员基础表，超级管理员返回全部。传orgUnitId则按指定部门查询。")
     @GetMapping("/basic/my")
     public ApiResponse<PageResponse<EmployeeBasicResponse>> getMyEmployeeBasic(
+            @RequestParam(required = false) Long orgUnitId,
             @RequestParam(required = false, defaultValue = "1") Integer pageNum,
             @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(staffLedgerService.getMyEmployeeBasic(pageNum, pageSize));
+        return ApiResponse.success(staffLedgerService.getMyEmployeeBasic(orgUnitId, pageNum, pageSize));
     }
 
     @Operation(summary = "修改现员基础表", description = "考勤管理员修改现员基础表中的工种、部门班组、劳动班制、班组长。")
@@ -104,10 +105,29 @@ public class StaffLedgerController {
         return ApiResponse.success(staffLedgerService.getMyLedger(month));
     }
 
-    @Operation(summary = "待审核台账列表")
+    @Operation(summary = "提交本部门现员基础表至人事科", description = "考勤管理员将本部门的现员基础表提交给劳动人事科。")
+    @PostMapping("/basic/submit")
+    public ApiResponse<Void> submitBasicTable() {
+        staffLedgerService.submitBasicTable();
+        return ApiResponse.success("现员基础表提交成功", null);
+    }
+
+    @Operation(summary = "各部门现员基础表提交状态", description = "劳动人事科查看所有部门的现员基础表提交情况，支持按状态筛选和分页。")
+    @GetMapping("/basic/submissions")
+    public ApiResponse<PageResponse<Map<String, Object>>> getBasicTableSubmissions(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return ApiResponse.success(staffLedgerService.getBasicTableSubmissions(status, pageNum, pageSize));
+    }
+
+    @Operation(summary = "待审核台账列表", description = "查询台账列表，不传状态则返回全部，支持分页。")
     @GetMapping("/pending")
-    public ApiResponse<List<LedgerPendingResponse>> getPendingLedgers(@RequestParam(required = false) String status) {
-        return ApiResponse.success(staffLedgerService.getPendingLedgers(status));
+    public ApiResponse<PageResponse<LedgerPendingResponse>> getPendingLedgers(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return ApiResponse.success(staffLedgerService.getPendingLedgers(status, pageNum, pageSize));
     }
 
     @Operation(summary = "所有台账列表(超级管理员)")
@@ -159,6 +179,12 @@ public class StaffLedgerController {
         return ApiResponse.success("提交成功", staffLedgerService.submitLedger(id));
     }
 
+    @Operation(summary = "提交现员表至人事科", description = "考勤管理员将本部门当月现员表提交给劳动人事科审核。")
+    @PostMapping("/submit-to-hr")
+    public ApiResponse<LedgerResponse> submitLedgerToHr(@RequestParam(required = false) String month) {
+        return ApiResponse.success("提交成功", staffLedgerService.submitLedgerToHr(month));
+    }
+
     @Operation(summary = "主任审批台账", description = "车间主任审批台账，可同意或退回。")
     @PostMapping("/{id}/approve")
     public ApiResponse<LedgerResponse> approveLedger(@PathVariable Long id, @Valid @RequestBody ApproveLedgerRequest request) {
@@ -189,6 +215,18 @@ public class StaffLedgerController {
         try {
             byte[] data = ledgerExportService.exportLedgerToExcel(id);
             String filename = URLEncoder.encode("现员台账.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    @Operation(summary = "导出按班别分列的现员分布台账Excel", description = "按日勤/甲班/乙班/丙班/丁班/预备分列展示员工姓名。")
+    @GetMapping("/{id}/distribution-excel")
+    public ResponseEntity<byte[]> exportLedgerDistributionExcel(@PathVariable Long id) {
+        try {
+            byte[] data = ledgerExportService.exportLedgerDistributionExcel(id);
+            String filename = URLEncoder.encode("现员分布台账.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);

@@ -3,6 +3,7 @@ package com.attendance.leave.mapper;
 import com.attendance.auth.dto.DashboardLeaveTypeCountResponse;
 import com.attendance.leave.enums.LeaveRequestStatus;
 import com.attendance.leave.model.LeaveRequest;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.apache.ibatis.annotations.Insert;
@@ -33,7 +34,7 @@ public interface LeaveRequestMapper {
             SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,
                    applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,
                    allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,
-                   final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, party_secretary_first, created_by, created_at, updated_at
+                   final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, party_secretary_first, created_by, created_at, updated_at
             FROM leave_request
             WHERE id = #{id}
             """)
@@ -43,7 +44,7 @@ public interface LeaveRequestMapper {
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
-            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, created_by, created_at, updated_at",
             "FROM leave_request",
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
@@ -60,7 +61,7 @@ public interface LeaveRequestMapper {
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
-            "       final_approved_at, party_secretary_first, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "       final_approved_at, party_secretary_first, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, created_by, created_at, updated_at",
             "FROM leave_request",
             "<where>",
             "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
@@ -125,7 +126,7 @@ public interface LeaveRequestMapper {
             "SELECT DISTINCT lr.id, lr.request_no, lr.applicant_id, lr.org_unit_id, lr.leave_type_id, lr.approval_rule_id, lr.applicant_type,",
             "       lr.applicant_name_snapshot, lr.position_level_code, lr.job_title_snapshot, lr.team_leader_snapshot, lr.start_date, lr.end_date, lr.start_time, lr.end_time, lr.leave_days,",
             "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.current_approver_id, lr.submitted_by, lr.submitted_at,",
-            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.party_secretary_first, lr.created_by, lr.created_at, lr.updated_at",
+            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.team_leader_signature_date, lr.party_secretary_first, lr.created_by, lr.created_at, lr.updated_at",
             "FROM leave_request lr",
             "JOIN leave_approval la ON la.leave_request_id = lr.id",
             "WHERE la.approval_status = 'PENDING'",
@@ -180,7 +181,7 @@ public interface LeaveRequestMapper {
             "SELECT DISTINCT lr.id, lr.request_no, lr.applicant_id, lr.org_unit_id, lr.leave_type_id, lr.approval_rule_id, lr.applicant_type,",
             "       lr.applicant_name_snapshot, lr.position_level_code, lr.job_title_snapshot, lr.team_leader_snapshot, lr.start_date, lr.end_date, lr.start_time, lr.end_time, lr.leave_days,",
             "       lr.allowed_days, lr.exceeds_one_month, lr.reason, lr.remark, lr.status, lr.current_step, lr.current_action_type, lr.current_approver_id, lr.submitted_by, lr.submitted_at,",
-            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.party_secretary_first, lr.created_by, lr.created_at, lr.updated_at",
+            "       lr.final_approved_at, lr.applicant_signature_url, lr.applicant_date_signature_url, lr.team_leader_signature_url, lr.team_leader_signature_date, lr.party_secretary_first, lr.created_by, lr.created_at, lr.updated_at",
             "FROM leave_request lr",
             "WHERE EXISTS (",
             "  SELECT 1",
@@ -275,7 +276,7 @@ public interface LeaveRequestMapper {
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
-            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, created_by, created_at, updated_at",
             "FROM leave_request",
             "WHERE applicant_name_snapshot = #{applicantNameSnapshot}",
             "  AND leave_type_id = #{leaveTypeId}",
@@ -325,10 +326,27 @@ public interface LeaveRequestMapper {
     @Update("""
             UPDATE leave_request
             SET team_leader_signature_url = #{teamLeaderSignatureUrl},
+                team_leader_signature_date = #{teamLeaderSignatureDate},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
             """)
-    int updateTeamLeaderSignatureUrl(@Param("id") Long id, @Param("teamLeaderSignatureUrl") String teamLeaderSignatureUrl);
+    int updateTeamLeaderSignatureUrl(@Param("id") Long id, @Param("teamLeaderSignatureUrl") String teamLeaderSignatureUrl, @Param("teamLeaderSignatureDate") LocalDate teamLeaderSignatureDate);
+
+    @Update("""
+            UPDATE leave_request
+            SET team_leader_signature_url = #{teamLeaderSignatureUrl},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateTeamLeaderSignatureUrlOnly(@Param("id") Long id, @Param("teamLeaderSignatureUrl") String teamLeaderSignatureUrl);
+
+    @Update("""
+            UPDATE leave_request
+            SET team_leader_signature_date = #{teamLeaderSignatureDate},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateTeamLeaderSignatureDate(@Param("id") Long id, @Param("teamLeaderSignatureDate") LocalDate teamLeaderSignatureDate);
 
     @Update("""
             UPDATE leave_request
@@ -384,7 +402,7 @@ public interface LeaveRequestMapper {
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
-            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, created_by, created_at, updated_at",
             "FROM leave_request",
             "WHERE org_unit_id = #{orgUnitId}",
             "  AND status = 'APPROVED'",
@@ -401,7 +419,7 @@ public interface LeaveRequestMapper {
             "SELECT id, request_no, applicant_id, org_unit_id, leave_type_id, approval_rule_id, applicant_type,",
             "       applicant_name_snapshot, position_level_code, job_title_snapshot, team_leader_snapshot, start_date, end_date, start_time, end_time, leave_days,",
             "       allowed_days, exceeds_one_month, reason, remark, status, current_step, current_action_type, current_approver_id, submitted_by, submitted_at,",
-            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, created_by, created_at, updated_at",
+            "       final_approved_at, applicant_signature_url, applicant_date_signature_url, team_leader_signature_url, team_leader_signature_date, created_by, created_at, updated_at",
             "FROM leave_request",
             "<where>",
             "  end_time &gt;= #{threeMonthsAgo}",

@@ -68,6 +68,30 @@ public interface StaffLedgerMapper {
             """)
     List<StaffLedger> findByStatus(@Param("status") String status);
 
+    @Select({"<script>",
+            "SELECT COUNT(1) FROM staff_ledger",
+            "<where>",
+            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "</where>",
+            "</script>"})
+    Long countByCondition(@Param("status") String status);
+
+    @Select({"<script>",
+            "SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,",
+            "    director_user_id, director_opinion, director_approved_at,",
+            "    hr_user_id, hr_opinion, hr_approved_at,",
+            "    submitted_at, created_by, created_at, updated_at",
+            "FROM staff_ledger",
+            "<where>",
+            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "</where>",
+            "ORDER BY updated_at DESC",
+            "LIMIT #{offset}, #{pageSize}",
+            "</script>"})
+    List<StaffLedger> findPageByCondition(@Param("status") String status,
+                                           @Param("offset") Integer offset,
+                                           @Param("pageSize") Integer pageSize);
+
     @Update("""
             UPDATE staff_ledger
             SET status = #{status}, in_work_count = #{inWorkCount}, remark = #{remark},
@@ -100,4 +124,14 @@ public interface StaffLedgerMapper {
             WHERE id = #{id}
             """)
     int updateSubmitted(StaffLedger ledger);
+
+    @Update("""
+            UPDATE staff_ledger
+            SET status = 'DRAFT', director_user_id = NULL, director_opinion = NULL, director_approved_at = NULL,
+                hr_user_id = NULL, hr_opinion = NULL, hr_approved_at = NULL, submitted_at = NULL,
+                in_work_count = NULL, remark = NULL, change_description = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int resetForSync(StaffLedger ledger);
 }

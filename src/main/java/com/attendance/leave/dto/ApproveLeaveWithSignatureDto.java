@@ -1,8 +1,9 @@
 package com.attendance.leave.dto;
 
 import jakarta.validation.constraints.NotNull;
-import java.time.LocalDate;
 import lombok.Data;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import org.springframework.web.multipart.MultipartFile;
 
 @Data
@@ -18,4 +19,6 @@ public class ApproveLeaveWithSignatureDto {
     private String signatureUrl;
 
     private LocalDate signatureDate;
+
+    private LocalDateTime approvedAt;
 }

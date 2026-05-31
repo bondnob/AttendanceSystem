@@ -14,27 +14,28 @@ import org.apache.ibatis.annotations.Update;
 public interface StaffLedgerDetailMapper {
 
     @Insert("""
-            INSERT INTO staff_ledger_detail (ledger_id, employee_basic_id, station_point, sort_no)
-            VALUES (#{ledgerId}, #{employeeBasicId}, #{stationPoint}, #{sortNo})
+            INSERT INTO staff_ledger_detail (ledger_id, employee_basic_id, station_point, team_name, shift_category, work_type, sort_no)
+            VALUES (#{ledgerId}, #{employeeBasicId}, #{stationPoint}, #{teamName}, #{shiftCategory}, #{workType}, #{sortNo})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(StaffLedgerDetail detail);
 
     @Select("""
-            SELECT id, ledger_id, employee_basic_id, station_point, sort_no, created_at, updated_at
+            SELECT id, ledger_id, employee_basic_id, station_point, team_name, shift_category, work_type, sort_no, created_at, updated_at
             FROM staff_ledger_detail WHERE id = #{id}
             """)
     StaffLedgerDetail findById(@Param("id") Long id);
 
     @Select("""
-            SELECT id, ledger_id, employee_basic_id, station_point, sort_no, created_at, updated_at
+            SELECT id, ledger_id, employee_basic_id, station_point, team_name, shift_category, work_type, sort_no, created_at, updated_at
             FROM staff_ledger_detail WHERE ledger_id = #{ledgerId} ORDER BY sort_no ASC, id ASC
             """)
     List<StaffLedgerDetail> findByLedgerId(@Param("ledgerId") Long ledgerId);
 
     @Update("""
             UPDATE staff_ledger_detail
-            SET station_point = #{stationPoint}, sort_no = #{sortNo}, updated_at = CURRENT_TIMESTAMP
+            SET station_point = #{stationPoint}, team_name = #{teamName}, shift_category = #{shiftCategory},
+                work_type = #{workType}, sort_no = #{sortNo}, updated_at = CURRENT_TIMESTAMP
             WHERE id = #{id}
             """)
     int update(StaffLedgerDetail detail);
@@ -44,10 +45,10 @@ public interface StaffLedgerDetailMapper {
 
     @Insert("""
             <script>
-            INSERT INTO staff_ledger_detail (ledger_id, employee_basic_id, station_point, sort_no)
+            INSERT INTO staff_ledger_detail (ledger_id, employee_basic_id, station_point, team_name, shift_category, work_type, sort_no)
             VALUES
             <foreach collection="list" item="d" separator=",">
-                (#{d.ledgerId}, #{d.employeeBasicId}, #{d.stationPoint}, #{d.sortNo})
+                (#{d.ledgerId}, #{d.employeeBasicId}, #{d.stationPoint}, #{d.teamName}, #{d.shiftCategory}, #{d.workType}, #{d.sortNo})
             </foreach>
             </script>
             """)

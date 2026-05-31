@@ -9,5 +9,8 @@ public class SaveLedgerDetailRequest {
     @NotNull
     private Long id;
     private String stationPoint;
+    private String teamName;
+    private String shiftCategory;
+    private String workType;
     private Integer sortNo;
 }

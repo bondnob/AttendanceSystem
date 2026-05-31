@@ -2,6 +2,7 @@ package com.attendance.ledger.mapper;
 
 import com.attendance.ledger.model.LedgerApprovalRecord;
 import java.util.List;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Options;
@@ -23,4 +24,7 @@ public interface LedgerApprovalRecordMapper {
             FROM ledger_approval_record WHERE ledger_id = #{ledgerId} ORDER BY created_at ASC
             """)
     List<LedgerApprovalRecord> findByLedgerId(@Param("ledgerId") Long ledgerId);
+
+    @Delete("DELETE FROM ledger_approval_record WHERE ledger_id = #{ledgerId}")
+    int deleteByLedgerId(@Param("ledgerId") Long ledgerId);
 }

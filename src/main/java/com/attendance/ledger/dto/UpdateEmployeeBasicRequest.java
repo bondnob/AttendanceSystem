@@ -12,5 +12,5 @@ public class UpdateEmployeeBasicRequest {
     private String workType;
     private String teamName;
     private String laborShift;
-    private Integer isTeamLeader;
+    private String isTeamLeader;
 }
