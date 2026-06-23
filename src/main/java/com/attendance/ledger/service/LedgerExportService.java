@@ -132,6 +132,8 @@ public class LedgerExportService {
             fillSheetFromTemplate(tplWb, sheet, ledger);
             // 第二行写入当月日期并合并至与表格等宽
             fillDateRow(tplWb, sheet, ledger);
+            // 合并"班别"到"班制"之间的单元格
+            mergeBanBieRow(sheet);
             // 全部填完后统一加内外边框
             addBorders(tplWb, sheet);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -169,6 +171,21 @@ public class LedgerExportService {
         if (row1 == null) row1 = sheet.createRow(1);
         Cell cell = row1.getCell(0, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
         cell.setCellValue(dateText);
+    }
+
+    private void mergeBanBieRow(Sheet sheet) {
+        Row row3 = sheet.getRow(2);
+        if (row3 == null) return;
+        int banBieCol = -1, banZhiCol = -1;
+        for (int i = 0; i <= 25; i++) {
+            Cell c = row3.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            if (c == null || c.getCellType() != CellType.STRING) continue;
+            String v = c.getStringCellValue().trim();
+            if (v.equals("班别")) banBieCol = i;
+            else if (v.equals("班制")) banZhiCol = i;
+        }
+        if (banBieCol < 0 || banZhiCol <= banBieCol) return;
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, banBieCol, banZhiCol - 1));
     }
 
     private void addBorders(Workbook wb, Sheet sheet) {
