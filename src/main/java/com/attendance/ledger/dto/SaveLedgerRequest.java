@@ -7,7 +7,6 @@ import lombok.Data;
 @Data
 public class SaveLedgerRequest {
 
-    private Integer inWorkCount;
     private String remark;
     private String changeDescription;
 

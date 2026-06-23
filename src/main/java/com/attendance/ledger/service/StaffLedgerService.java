@@ -19,6 +19,7 @@ import com.attendance.ledger.dto.LedgerPendingResponse;
 import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerDetailRequest;
 import com.attendance.ledger.dto.SaveLedgerRequest;
+import com.attendance.ledger.dto.SubmitLedgerRequest;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
 import com.attendance.ledger.mapper.EmployeeBasicMapper;
 import com.attendance.ledger.mapper.EmployeeBasicSubmissionMapper;
@@ -115,14 +116,16 @@ public class StaffLedgerService {
                 String gender = getCellStringValue(row, 2);
                 String birthDate = getCellStringValue(row, 3);
                 String workType = getCellStringValue(row, 4);
-                String identityType = getCellStringValue(row, 5);
-                String categoryMajor = getCellStringValue(row, 6);
-                String categoryMinor = getCellStringValue(row, 7);
-                Integer age = getCellIntValue(row, 8);
-                String laborShift = getCellStringValue(row, 9);
-                String teamLeaderStr = getCellStringValue(row, 10);
-                String orgName = getCellStringValue(row, 11);
-                String teamName = getCellStringValue(row, 12);
+                String actualWorkType = getCellStringValue(row, 5);
+                String identityType = getCellStringValue(row, 6);
+                String categoryMajor = getCellStringValue(row, 7);
+                String categoryMinor = getCellStringValue(row, 8);
+                Integer age = getCellIntValue(row, 9);
+                String laborShift = getCellStringValue(row, 10);
+                String teamLeaderStr = getCellStringValue(row, 11);
+                String orgName = getCellStringValue(row, 12);
+                String teamName = getCellStringValue(row, 13);
+                String retirementDate = getCellStringValue(row, 14);
 
                 if (age == null && birthDate != null && !birthDate.isBlank()) {
                     try {
@@ -163,20 +166,25 @@ public class StaffLedgerService {
                 if (existing != null) {
                     existing.setEmpName(empName); existing.setGender(gender); existing.setBirthDate(birthDate);
 
-                    existing.setWorkType(workType); existing.setIdentityType(identityType);
+                    existing.setWorkType(workType); existing.setActualWorkType(actualWorkType);
+                    existing.setIdentityType(identityType);
                     existing.setCategoryMajor(categoryMajor); existing.setCategoryMinor(categoryMinor);
                     existing.setAge(age); existing.setLaborShift(laborShift); existing.setIsTeamLeader(isTeamLeader);
-                    existing.setOrgUnitId(orgUnitId); existing.setTeamName(teamName); existing.setIsActive(1);
+                    existing.setOrgUnitId(orgUnitId); existing.setTeamName(teamName);
+                    existing.setRetirementDate(retirementDate); existing.setIsActive(1);
                     existing.setUploadBatch(uploadBatch);
                     employeeBasicMapper.updateByIdCardNo(existing);
                     updated++;
                 } else {
                     EmployeeBasic emp = new EmployeeBasic();
                     emp.setIdCardNo(idCardNo); emp.setEmpName(empName); emp.setGender(gender);
-                    emp.setBirthDate(birthDate); emp.setWorkType(workType); emp.setIdentityType(identityType);
+                    emp.setBirthDate(birthDate); emp.setWorkType(workType);
+                    emp.setActualWorkType(actualWorkType);
+                    emp.setIdentityType(identityType);
                     emp.setCategoryMajor(categoryMajor); emp.setCategoryMinor(categoryMinor);
                     emp.setAge(age); emp.setLaborShift(laborShift); emp.setIsTeamLeader(isTeamLeader);
-                    emp.setOrgUnitId(orgUnitId); emp.setTeamName(teamName); emp.setIsActive(1);
+                    emp.setOrgUnitId(orgUnitId); emp.setTeamName(teamName);
+                    emp.setRetirementDate(retirementDate); emp.setIsActive(1);
                     emp.setUploadBatch(uploadBatch);
                     employeeBasicMapper.insert(emp);
                     imported++;
@@ -211,22 +219,29 @@ public class StaffLedgerService {
         }
     }
 
-    public PageResponse<EmployeeBasicResponse> getMyEmployeeBasic(Long orgUnitId, Integer pageNum, Integer pageSize) {
+    public PageResponse<EmployeeBasicResponse> getMyEmployeeBasic(Long orgUnitId, String categoryMajor, Integer retirementAge, Integer pageNum, Integer pageSize) {
         CurrentUser currentUser = requireLogin();
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 500);
         int offset = (safePageNum - 1) * safePageSize;
+        boolean hasFilter = (categoryMajor != null && !categoryMajor.isBlank()) || retirementAge != null;
 
         Long queryOrgId = orgUnitId != null ? orgUnitId : currentUser.getOrgUnitId();
 
         long total;
         List<EmployeeBasic> list;
-        if (isSystemAdmin(currentUser) && orgUnitId == null) {
+        if (isSystemAdmin(currentUser) && orgUnitId == null && !hasFilter) {
             total = employeeBasicMapper.countAll();
             list = employeeBasicMapper.findAllWithPage(offset, safePageSize);
+        } else if (isSystemAdmin(currentUser) && orgUnitId == null) {
+            total = employeeBasicMapper.countFiltered(null, categoryMajor, retirementAge);
+            list = total > 0 ? employeeBasicMapper.findFilteredWithPage(null, categoryMajor, retirementAge, offset, safePageSize) : List.of();
+        } else if (hasFilter) {
+            total = employeeBasicMapper.countFiltered(queryOrgId, categoryMajor, retirementAge);
+            list = total > 0 ? employeeBasicMapper.findFilteredWithPage(queryOrgId, categoryMajor, retirementAge, offset, safePageSize) : List.of();
         } else {
-            total = employeeBasicMapper.countByOrgUnitId(queryOrgId);
-            list = employeeBasicMapper.findByOrgUnitIdWithPage(queryOrgId, offset, safePageSize);
+            total = employeeBasicMapper.countDistributedByOrgUnitId(queryOrgId);
+            list = total > 0 ? employeeBasicMapper.findDistributedByOrgUnitIdWithPage(queryOrgId, offset, safePageSize) : List.of();
         }
 
         List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
@@ -242,10 +257,15 @@ public class StaffLedgerService {
         if (!emp.getOrgUnitId().equals(currentUser.getOrgUnitId())) throw new BizException("无权修改该员工信息");
         if (emp.getIsDistributed() == null || emp.getIsDistributed() != 1) throw new BizException("该员工数据未下发，不能修改");
 
-        emp.setWorkType(request.getWorkType());
+        emp.setActualWorkType(request.getActualWorkType());
+        // 只有当请求传了workType时才更新，否则保持原值
+        if (request.getWorkType() != null) {
+            emp.setWorkType(request.getWorkType());
+        }
         emp.setTeamName(request.getTeamName());
         emp.setLaborShift(request.getLaborShift());
         emp.setIsTeamLeader(request.getIsTeamLeader());
+        emp.setRetirementDate(request.getRetirementDate());
         employeeBasicMapper.updateEditableFields(emp);
         return toEmployeeBasicResponse(employeeBasicMapper.findById(emp.getId()));
     }
@@ -284,13 +304,9 @@ public class StaffLedgerService {
             StaffLedgerDetail detail = new StaffLedgerDetail();
             detail.setLedgerId(ledger.getId());
             detail.setEmployeeBasicId(emp.getId());
-            detail.setTeamName(emp.getTeamName());
+            // 只同步工种和职务，岗点、班组由用户手动填写
             detail.setWorkType(emp.getWorkType());
-            // 根据班组名称查找班别
-            if (emp.getTeamName() != null && !emp.getTeamName().isBlank()) {
-                TeamName tn = teamNameMapper.findByOrgUnitIdAndTeamName(orgUnitId, emp.getTeamName());
-                detail.setShiftCategory(tn != null ? tn.getShiftCategory() : null);
-            }
+            detail.setIdentityType(emp.getIdentityType());
             detail.setSortNo(sortNo++);
             details.add(detail);
         }
@@ -301,11 +317,14 @@ public class StaffLedgerService {
         ledger.setInWorkCount(workCount);
 
         StringBuilder remark = new StringBuilder();
+        // 获取退休年龄阈值配置
+        LedgerConfig retirementConfig = ledgerConfigMapper.findByKey("retirement_age_threshold");
+        int retirementAgeThreshold = retirementConfig != null ? Integer.parseInt(retirementConfig.getConfigValue()) : 59;
         List<EmployeeBasic> nearRetirement = employeeBasicMapper.findNearRetirementByOrgUnitId(orgUnitId);
         if (!nearRetirement.isEmpty()) {
-            remark.append("即将退休人员：");
+            remark.append("即将退休人员（").append(retirementAgeThreshold).append("岁及以上）：");
             for (EmployeeBasic emp : nearRetirement) {
-                remark.append(emp.getEmpName()).append("(").append(emp.getBirthDate()).append(")、");
+                remark.append(emp.getEmpName()).append("(").append(emp.getBirthDate()).append(", ").append(emp.getAge()).append("岁)、");
             }
             remark.setLength(remark.length() - 1);
         }
@@ -344,10 +363,23 @@ public class StaffLedgerService {
             detail.setShiftCategory(detailReq.getShiftCategory());
             detail.setWorkType(detailReq.getWorkType());
             detail.setSortNo(detailReq.getSortNo());
+            detail.setJiaBan1(detailReq.getJiaBan1());
+            detail.setJiaBan2(detailReq.getJiaBan2());
+            detail.setYiBan1(detailReq.getYiBan1());
+            detail.setYiBan2(detailReq.getYiBan2());
+            detail.setBingBan1(detailReq.getBingBan1());
+            detail.setBingBan2(detailReq.getBingBan2());
+            detail.setDingBan1(detailReq.getDingBan1());
+            detail.setDingBan2(detailReq.getDingBan2());
+            detail.setYuBei1(detailReq.getYuBei1());
+            detail.setYuBei2(detailReq.getYuBei2());
+            detail.setDailyName(detailReq.getDailyName());
+            detail.setIdentityType(detailReq.getIdentityType());
+            detail.setExtraShiftJson(detailReq.getExtraShiftJson());
             staffLedgerDetailMapper.update(detail);
         }
 
-        if (request.getInWorkCount() != null) ledger.setInWorkCount(request.getInWorkCount());
+        ledger.setInWorkCount(employeeBasicMapper.countActiveDistributedByOrgUnitId(ledger.getOrgUnitId()).intValue());
         if (request.getRemark() != null) ledger.setRemark(request.getRemark());
         if (request.getChangeDescription() != null) ledger.setChangeDescription(request.getChangeDescription());
         staffLedgerMapper.updateStatusAndCounts(ledger);
@@ -355,18 +387,47 @@ public class StaffLedgerService {
     }
 
     @Transactional
-    public LedgerResponse submitLedger(Long ledgerId) {
+    public LedgerResponse submitLedger(SubmitLedgerRequest request) {
         CurrentUser currentUser = requireLogin();
-        StaffLedger ledger = requireLedger(ledgerId);
-        if (!STATUS_DRAFT.equals(ledger.getStatus()) && !STATUS_RETURNED.equals(ledger.getStatus()))
-            throw new BizException("当前状态不允许提交");
-        if (!ledger.getOrgUnitId().equals(currentUser.getOrgUnitId()) && !isSystemAdmin(currentUser))
-            throw new BizException("无权提交该台账");
+        Long orgUnitId = currentUser.getOrgUnitId();
+        String effectiveMonth = (request != null && request.getMonth() != null) ? request.getMonth() : LocalDate.now().format(MONTH_FMT);
+
+        // 直接按部门id+月份找台账，不存在则新建，存在则覆盖
+        StaffLedger ledger = staffLedgerMapper.findByOrgUnitAndMonth(orgUnitId, effectiveMonth);
+        if (ledger == null) {
+            ledger = new StaffLedger();
+            ledger.setOrgUnitId(orgUnitId);
+            ledger.setLedgerMonth(effectiveMonth);
+            ledger.setStatus(STATUS_DRAFT);
+            ledger.setCreatedBy(currentUser.getUserId());
+            staffLedgerMapper.insert(ledger);
+        }
+
+        // 保存表头字段
+        if (request != null) {
+            ledger.setInWorkCount(employeeBasicMapper.countActiveDistributedByOrgUnitId(orgUnitId).intValue());
+            if (request.getRemark() != null) ledger.setRemark(request.getRemark());
+            if (request.getChangeDescription() != null) ledger.setChangeDescription(request.getChangeDescription());
+            // 保存明细：先清空旧数据，再全部重新插入（覆盖提交）
+            if (request.getDetails() != null && !request.getDetails().isEmpty()) {
+                staffLedgerDetailMapper.deleteByLedgerId(ledger.getId());
+                List<StaffLedgerDetail> newDetails = new ArrayList<>();
+                for (SaveLedgerDetailRequest detailReq : request.getDetails()) {
+                    StaffLedgerDetail detail = new StaffLedgerDetail();
+                    detail.setLedgerId(ledger.getId());
+                    detail.setEmployeeBasicId(detailReq.getEmployeeBasicId());
+                    setDetailFields(detail, detailReq);
+                    newDetails.add(detail);
+                }
+                staffLedgerDetailMapper.batchInsert(newDetails);
+            }
+        }
 
         ledger.setStatus(STATUS_SUBMITTED);
         ledger.setSubmittedAt(LocalDateTime.now());
         staffLedgerMapper.updateSubmitted(ledger);
-        saveApprovalRecord(ledgerId, STEP_DIRECTOR, "SUBMIT", null, currentUser.getUserId());
+        staffLedgerMapper.updateStatusAndCounts(ledger);
+        saveApprovalRecord(ledger.getId(), STEP_DIRECTOR, "SUBMIT", null, currentUser.getUserId());
         return buildLedgerResponse(ledger);
     }
 
@@ -469,12 +530,19 @@ public class StaffLedgerService {
     }
 
     public PageResponse<LedgerPendingResponse> getPendingLedgers(String status, Integer pageNum, Integer pageSize) {
-        requireLogin();
+        CurrentUser currentUser = requireLogin();
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
         int offset = (safePageNum - 1) * safePageSize;
-        Long total = staffLedgerMapper.countByCondition(status);
-        List<StaffLedger> ledgers = staffLedgerMapper.findPageByCondition(status, offset, safePageSize);
+        Long orgUnitId;
+        if (isSystemAdmin(currentUser) || isHrAdmin(currentUser)) {
+            // 超级管理员和人事科管理员可以查看所有部门的台账
+            orgUnitId = null;
+        } else {
+            orgUnitId = currentUser.getOrgUnitId();
+        }
+        Long total = staffLedgerMapper.countByCondition(orgUnitId, status);
+        List<StaffLedger> ledgers = staffLedgerMapper.findPageByCondition(orgUnitId, status, offset, safePageSize);
         List<LedgerPendingResponse> records = ledgers.stream().map(l -> {
             OrgUnit org = orgUnitMapper.findById(l.getOrgUnitId());
             UserAccount creator = userAccountMapper.findById(l.getCreatedBy());
@@ -602,23 +670,36 @@ public class StaffLedgerService {
         List<LedgerDetailResponse> nonWorkingResponses = new ArrayList<>();
 
         for (StaffLedgerDetail detail : details) {
-            EmployeeBasic emp = employeeBasicMapper.findById(detail.getEmployeeBasicId());
-            if (emp == null) continue;
+            EmployeeBasic emp = detail.getEmployeeBasicId() != null ? employeeBasicMapper.findById(detail.getEmployeeBasicId()) : null;
             LedgerDetailResponse resp = LedgerDetailResponse.builder()
                     .id(detail.getId()).employeeBasicId(detail.getEmployeeBasicId())
-                    .idCardNo(emp.getIdCardNo()).empName(emp.getEmpName()).gender(emp.getGender())
-                    .birthDate(emp.getBirthDate()).age(emp.getAge())
-                    .workType(detail.getWorkType() != null ? detail.getWorkType() : emp.getWorkType())
-                    .identityType(emp.getIdentityType()).categoryMajor(emp.getCategoryMajor())
-                    .categoryMinor(emp.getCategoryMinor()).laborShift(emp.getLaborShift())
-                    .teamName(detail.getTeamName() != null ? detail.getTeamName() : emp.getTeamName())
+                    .idCardNo(emp != null ? emp.getIdCardNo() : null)
+                    .empName(emp != null ? emp.getEmpName() : null)
+                    .gender(emp != null ? emp.getGender() : null)
+                    .birthDate(emp != null ? emp.getBirthDate() : null)
+                    .age(emp != null ? emp.getAge() : null)
+                    .workType(detail.getWorkType() != null ? detail.getWorkType() : (emp != null ? emp.getWorkType() : null))
+                    .identityType(detail.getIdentityType() != null ? detail.getIdentityType() : (emp != null ? emp.getIdentityType() : null))
+                    .categoryMajor(emp != null ? emp.getCategoryMajor() : null)
+                    .categoryMinor(emp != null ? emp.getCategoryMinor() : null)
+                    .laborShift(emp != null ? emp.getLaborShift() : null)
+                    .teamName(detail.getTeamName() != null ? detail.getTeamName() : (emp != null ? emp.getTeamName() : null))
                     .shiftCategory(detail.getShiftCategory())
                     .stationPoint(detail.getStationPoint())
-                    .shiftType(emp.getLaborShift()).isTeamLeader(emp.getIsTeamLeader())
-                    .isNonWorking(emp.getIsActive() == 0 ? 1 : 0)
-                    .nonWorkingReason(emp.getIsActive() == 0 ? emp.getCategoryMajor() : null)
-                    .sortNo(detail.getSortNo()).build();
-            if (emp.getIsActive() == 0) nonWorkingResponses.add(resp); else detailResponses.add(resp);
+                    .shiftType(emp != null ? emp.getLaborShift() : null)
+                    .isTeamLeader(emp != null ? emp.getIsTeamLeader() : null)
+                    .isNonWorking(emp != null && emp.getIsActive() == 0 ? 1 : 0)
+                    .nonWorkingReason(emp != null && emp.getIsActive() == 0 ? emp.getCategoryMajor() : null)
+                    .sortNo(detail.getSortNo())
+                    .jiaBan1(detail.getJiaBan1()).jiaBan2(detail.getJiaBan2())
+                    .yiBan1(detail.getYiBan1()).yiBan2(detail.getYiBan2())
+                    .bingBan1(detail.getBingBan1()).bingBan2(detail.getBingBan2())
+                    .dingBan1(detail.getDingBan1()).dingBan2(detail.getDingBan2())
+                    .yuBei1(detail.getYuBei1()).yuBei2(detail.getYuBei2())
+                    .dailyName(detail.getDailyName())
+                    .extraShiftJson(detail.getExtraShiftJson())
+                    .build();
+            if (emp != null && emp.getIsActive() == 0) nonWorkingResponses.add(resp); else detailResponses.add(resp);
         }
 
         List<LedgerApprovalRecord> records = ledgerApprovalRecordMapper.findByLedgerId(ledger.getId());
@@ -651,12 +732,14 @@ public class StaffLedgerService {
         return EmployeeBasicResponse.builder()
                 .id(emp.getId()).idCardNo(emp.getIdCardNo()).empName(emp.getEmpName())
                 .gender(emp.getGender()).birthDate(emp.getBirthDate()).age(emp.getAge())
-                .workType(emp.getWorkType()).identityType(emp.getIdentityType())
+                .workType(emp.getWorkType()).actualWorkType(emp.getActualWorkType())
+                .identityType(emp.getIdentityType())
                 .categoryMajor(emp.getCategoryMajor()).categoryMinor(emp.getCategoryMinor())
                 .laborShift(emp.getLaborShift()).isTeamLeader(emp.getIsTeamLeader())
                 .orgUnitId(emp.getOrgUnitId()).orgUnitName(org != null ? org.getOrgName() : "")
                 .teamName(emp.getTeamName()).isActive(emp.getIsActive())
-                .isDistributed(emp.getIsDistributed()).distributedAt(emp.getDistributedAt()).build();
+                .isDistributed(emp.getIsDistributed()).distributedAt(emp.getDistributedAt())
+                .retirementDate(emp.getRetirementDate()).build();
     }
 
     private void addDiffIfChanged(List<LedgerMonthCompareResponse.CompareItem> differences, EmployeeBasic emp, String field, String prev, String curr) {
@@ -666,6 +749,27 @@ public class StaffLedgerService {
                     .empName(emp.getEmpName()).idCardNo(emp.getIdCardNo()).field(field)
                     .previousValue(p.isEmpty() ? "-" : p).currentValue(c.isEmpty() ? "-" : c).changeType("CHANGED").build());
         }
+    }
+
+    private void setDetailFields(StaffLedgerDetail detail, SaveLedgerDetailRequest req) {
+        detail.setStationPoint(req.getStationPoint());
+        detail.setTeamName(req.getTeamName());
+        detail.setShiftCategory(req.getShiftCategory());
+        detail.setWorkType(req.getWorkType());
+        detail.setSortNo(req.getSortNo());
+        detail.setJiaBan1(req.getJiaBan1());
+        detail.setJiaBan2(req.getJiaBan2());
+        detail.setYiBan1(req.getYiBan1());
+        detail.setYiBan2(req.getYiBan2());
+        detail.setBingBan1(req.getBingBan1());
+        detail.setBingBan2(req.getBingBan2());
+        detail.setDingBan1(req.getDingBan1());
+        detail.setDingBan2(req.getDingBan2());
+        detail.setYuBei1(req.getYuBei1());
+        detail.setYuBei2(req.getYuBei2());
+        detail.setDailyName(req.getDailyName());
+        detail.setIdentityType(req.getIdentityType());
+        detail.setExtraShiftJson(req.getExtraShiftJson());
     }
 
     private void saveApprovalRecord(Long ledgerId, String step, String action, String opinion, Long operatorId) {

@@ -21,7 +21,7 @@ import com.attendance.admin.service.AdminService;
 import com.attendance.common.ApiResponse;
 import com.attendance.common.PageResponse;
 import com.attendance.leave.dto.LeaveListItemResponse;
-import com.attendance.leave.service.LeaveService;
+import com.attendance.leave.service.LeaveQueryService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -39,7 +39,7 @@ import org.springframework.web.bind.annotation.*;
 public class AdminController {
 
     private final AdminService adminService;
-    private final LeaveService leaveService;
+    private final LeaveQueryService leaveQueryService;
 
     @Operation(summary = "新增组织")
     @PostMapping("/org-units")
@@ -192,6 +192,6 @@ public class AdminController {
             @RequestParam(required = false) String applicantName,
             @RequestParam(required = false, defaultValue = "1") Integer pageNum,
             @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(leaveService.listAllLeaves(status, leaveTypeId, applicantName, pageNum, pageSize));
+        return ApiResponse.success(leaveQueryService.listAllLeaves(status, leaveTypeId, applicantName, pageNum, pageSize));
     }
 }

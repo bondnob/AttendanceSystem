@@ -39,6 +39,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -293,9 +294,8 @@ public class AdminService {
     }
 
     public List<TeamNameResponse> listTeamNamesByOrgUnit(Long orgUnitId) {
-        return teamNameMapper.findByOrgUnitId(orgUnitId).stream()
-                .map(this::toTeamNameResponse)
-                .collect(Collectors.toList());
+        List<TeamName> teamNames = teamNameMapper.findByOrgUnitId(orgUnitId);
+        return toTeamNameResponseList(teamNames);
     }
 
     public PageResponse<TeamNameResponse> listTeamNames(Long orgUnitId, String teamName, Integer pageNum, Integer pageSize) {
@@ -303,9 +303,8 @@ public class AdminService {
         Long total = teamNameMapper.countByCondition(orgUnitId, keyword);
         // 不传分页参数则返回全部
         if (pageNum == null && pageSize == null) {
-            List<TeamNameResponse> data = teamNameMapper.findPageByCondition(orgUnitId, keyword, 0, Integer.MAX_VALUE).stream()
-                    .map(this::toTeamNameResponse)
-                    .collect(Collectors.toList());
+            List<TeamNameResponse> data = toTeamNameResponseList(
+                    teamNameMapper.findPageByCondition(orgUnitId, keyword, 0, Integer.MAX_VALUE));
             return PageResponse.<TeamNameResponse>builder()
                     .total(total == null ? 0L : total)
                     .pageNum(1)
@@ -316,9 +315,8 @@ public class AdminService {
         int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
         int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
         int offset = (safePageNum - 1) * safePageSize;
-        List<TeamNameResponse> data = teamNameMapper.findPageByCondition(orgUnitId, keyword, offset, safePageSize).stream()
-                .map(this::toTeamNameResponse)
-                .collect(Collectors.toList());
+        List<TeamNameResponse> data = toTeamNameResponseList(
+                teamNameMapper.findPageByCondition(orgUnitId, keyword, offset, safePageSize));
         return PageResponse.<TeamNameResponse>builder()
                 .total(total == null ? 0L : total)
                 .pageNum(safePageNum)
@@ -388,6 +386,31 @@ public class AdminService {
     private Integer generateTeamNameSortNo(Long orgUnitId) {
         Integer maxSortNo = teamNameMapper.findMaxSortNoByOrgUnitId(orgUnitId);
         return maxSortNo == null ? 1 : maxSortNo + 1;
+    }
+
+    private List<TeamNameResponse> toTeamNameResponseList(List<TeamName> teamNames) {
+        if (teamNames == null || teamNames.isEmpty()) {
+            return List.of();
+        }
+        List<Long> orgUnitIds = teamNames.stream()
+                .map(TeamName::getOrgUnitId)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, String> orgNameMap = orgUnitMapper.findByIds(orgUnitIds).stream()
+                .collect(Collectors.toMap(OrgUnit::getId, OrgUnit::getOrgName));
+        return teamNames.stream()
+                .map(t -> TeamNameResponse.builder()
+                        .id(t.getId())
+                        .orgUnitId(t.getOrgUnitId())
+                        .orgUnitName(orgNameMap.get(t.getOrgUnitId()))
+                        .teamName(t.getTeamName())
+                        .shiftCategory(t.getShiftCategory())
+                        .sortNo(t.getSortNo())
+                        .isEnabled(t.getIsEnabled())
+                        .createdAt(t.getCreatedAt())
+                        .updatedAt(t.getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
     }
 
     private TeamNameResponse toTeamNameResponse(TeamName teamName) {

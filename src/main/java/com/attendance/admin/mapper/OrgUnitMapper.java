@@ -60,6 +60,18 @@ public interface OrgUnitMapper {
     OrgUnit findById(@Param("id") Long id);
 
     @Select("""
+            <script>
+            SELECT id, org_code, org_name, org_type, sort_no, is_enabled
+            FROM org_unit
+            WHERE id IN
+            <foreach collection="ids" item="id" open="(" separator="," close=")">
+                #{id}
+            </foreach>
+            </script>
+            """)
+    List<OrgUnit> findByIds(@Param("ids") List<Long> ids);
+
+    @Select("""
             SELECT org_code
             FROM org_unit
             WHERE org_type = #{orgType}

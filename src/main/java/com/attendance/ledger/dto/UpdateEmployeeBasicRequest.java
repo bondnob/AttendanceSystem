@@ -10,7 +10,9 @@ public class UpdateEmployeeBasicRequest {
     private Long id;
 
     private String workType;
+    private String actualWorkType;
     private String teamName;
     private String laborShift;
     private String isTeamLeader;
+    private String retirementDate;
 }

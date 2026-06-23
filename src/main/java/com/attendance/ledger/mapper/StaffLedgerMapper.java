@@ -71,10 +71,11 @@ public interface StaffLedgerMapper {
     @Select({"<script>",
             "SELECT COUNT(1) FROM staff_ledger",
             "<where>",
-            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
+            "  <if test='status != null and status != \"\"'> AND status = #{status}</if>",
             "</where>",
             "</script>"})
-    Long countByCondition(@Param("status") String status);
+    Long countByCondition(@Param("orgUnitId") Long orgUnitId, @Param("status") String status);
 
     @Select({"<script>",
             "SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,",
@@ -83,12 +84,14 @@ public interface StaffLedgerMapper {
             "    submitted_at, created_by, created_at, updated_at",
             "FROM staff_ledger",
             "<where>",
-            "  <if test='status != null and status != \"\"'> status = #{status}</if>",
+            "  <if test='orgUnitId != null'> org_unit_id = #{orgUnitId}</if>",
+            "  <if test='status != null and status != \"\"'> AND status = #{status}</if>",
             "</where>",
             "ORDER BY updated_at DESC",
             "LIMIT #{offset}, #{pageSize}",
             "</script>"})
-    List<StaffLedger> findPageByCondition(@Param("status") String status,
+    List<StaffLedger> findPageByCondition(@Param("orgUnitId") Long orgUnitId,
+                                           @Param("status") String status,
                                            @Param("offset") Integer offset,
                                            @Param("pageSize") Integer pageSize);
 

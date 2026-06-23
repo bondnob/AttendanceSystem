@@ -1,5 +1,7 @@
 package com.attendance.ledger.controller;
 
+import com.attendance.auth.security.CurrentUser;
+import com.attendance.auth.security.UserContext;
 import com.attendance.common.ApiResponse;
 import com.attendance.common.PageResponse;
 import com.attendance.ledger.dto.ApproveLedgerRequest;
@@ -11,7 +13,11 @@ import com.attendance.ledger.dto.LedgerMonthCompareResponse;
 import com.attendance.ledger.dto.LedgerPendingResponse;
 import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerRequest;
+import com.attendance.ledger.dto.SubmitLedgerRequest;
+import com.attendance.ledger.dto.TemplateFieldsResponse;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
+import com.attendance.ledger.mapper.StaffLedgerMapper;
+import com.attendance.ledger.model.StaffLedger;
 import com.attendance.ledger.service.LedgerExportService;
 import com.attendance.ledger.service.StaffLedgerService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -19,9 +25,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -42,11 +51,13 @@ import org.springframework.web.multipart.MultipartFile;
 @Validated
 @RestController
 @RequiredArgsConstructor
+@Slf4j
 @RequestMapping("/api/ledger")
 public class StaffLedgerController {
 
     private final StaffLedgerService staffLedgerService;
     private final LedgerExportService ledgerExportService;
+    private final StaffLedgerMapper staffLedgerMapper;
 
     // ==================== 现员基础表相关 ====================
 
@@ -63,13 +74,15 @@ public class StaffLedgerController {
         return ApiResponse.success("下发成功", null);
     }
 
-    @Operation(summary = "获取本部门现员基础表", description = "考勤管理员获取本部门已下发的现员基础表，超级管理员返回全部。传orgUnitId则按指定部门查询。")
+    @Operation(summary = "获取本部门现员基础表", description = "考勤管理员获取本部门已下发的现员基础表，超级管理员返回全部。传orgUnitId则按指定部门查询。支持筛选非在岗和即将退休人员。")
     @GetMapping("/basic/my")
     public ApiResponse<PageResponse<EmployeeBasicResponse>> getMyEmployeeBasic(
             @RequestParam(required = false) Long orgUnitId,
+            @RequestParam(required = false) String categoryMajor,
+            @RequestParam(required = false) Integer retirementAge,
             @RequestParam(required = false, defaultValue = "1") Integer pageNum,
             @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(staffLedgerService.getMyEmployeeBasic(orgUnitId, pageNum, pageSize));
+        return ApiResponse.success(staffLedgerService.getMyEmployeeBasic(orgUnitId, categoryMajor, retirementAge, pageNum, pageSize));
     }
 
     @Operation(summary = "修改现员基础表", description = "考勤管理员修改现员基础表中的工种、部门班组、劳动班制、班组长。")
@@ -78,12 +91,45 @@ public class StaffLedgerController {
         return ApiResponse.success("修改成功", staffLedgerService.updateEmployeeBasic(request));
     }
 
-    @Operation(summary = "导出现员基础表(Excel)")
+    @Operation(summary = "导出现员基础表(Excel)", description = "支持按人员类别(categoryMajor)和退休年龄(retirementAge)筛选导出。")
     @GetMapping("/basic/export")
-    public ResponseEntity<byte[]> exportEmployeeBasic(@RequestParam(required = false) Long orgUnitId) {
+    public ResponseEntity<byte[]> exportEmployeeBasic(
+            @RequestParam(required = false) Long orgUnitId,
+            @RequestParam(required = false) String categoryMajor,
+            @RequestParam(required = false) Integer retirementAge) {
         try {
-            byte[] data = ledgerExportService.exportEmployeeBasicToExcel(orgUnitId);
+            byte[] data = ledgerExportService.exportEmployeeBasicToExcel(orgUnitId, categoryMajor, retirementAge);
             String filename = URLEncoder.encode("现员基础表.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(data);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    @Operation(summary = "批量导出多部门现员基础表(Excel)", description = "劳动人事科按选中的部门ID数组批量导出，每个部门一个Sheet。")
+    @PostMapping("/basic/batch-export")
+    public ResponseEntity<byte[]> batchExportEmployeeBasic(@RequestBody Map<String, List<Long>> body) {
+        try {
+            byte[] data = ledgerExportService.batchExportEmployeeBasicToExcel(body.get("orgUnitIds"));
+            String filename = URLEncoder.encode("现员基础表（批量）.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(data);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    @Operation(summary = "批量导出多部门现员台账(Excel)", description = "劳动人事科按选中的部门ID数组批量导出，每个部门一个Sheet。month不传默认当月。")
+    @PostMapping("/batch-export")
+    public ResponseEntity<byte[]> batchExportLedger(@RequestBody Map<String, Object> body,
+                                                    @RequestParam(required = false) String month) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Long> orgUnitIds = ((List<Number>) body.get("orgUnitIds")).stream().map(Number::longValue).collect(Collectors.toList());
+            String effectiveMonth = month != null ? month : (body.get("month") != null ? body.get("month").toString() : null);
+            byte[] data = ledgerExportService.batchExportLedgerToExcel(orgUnitIds, effectiveMonth);
+            String filename = URLEncoder.encode("现员台账（批量）.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
@@ -103,6 +149,33 @@ public class StaffLedgerController {
     @GetMapping("/my")
     public ApiResponse<LedgerResponse> getMyLedger(@RequestParam(required = false) String month) {
         return ApiResponse.success(staffLedgerService.getMyLedger(month));
+    }
+
+    @Operation(summary = "按模板导出本部门台账Excel", description = "自动根据当前用户所在部门查找台账并按车间模板导出。")
+    @GetMapping("/my/template-excel")
+    public ResponseEntity<byte[]> exportMyLedgerTemplateExcel(@RequestParam(required = false) String month) {
+        try {
+            CurrentUser currentUser = UserContext.get();
+            if (currentUser == null || currentUser.getOrgUnitId() == null)
+                return ResponseEntity.status(401).build();
+            String effectiveMonth = month != null ? month : LocalDate.now().toString().substring(0, 7);
+            StaffLedger ledger = staffLedgerMapper.findByOrgUnitAndMonth(currentUser.getOrgUnitId(), effectiveMonth);
+            if (ledger == null)
+                return ResponseEntity.badRequest()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .body("当前部门本月台账不存在，请先同步台账".getBytes(StandardCharsets.UTF_8));
+            byte[] data = ledgerExportService.fillTemplateExcel(ledger.getId());
+            String filename = URLEncoder.encode("现员分布台账_模板.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(data);
+        } catch (Exception e) {
+            log.error("按模板导出本部门台账Excel失败", e);
+            return ResponseEntity.internalServerError()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(("导出失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     @Operation(summary = "提交本部门现员基础表至人事科", description = "考勤管理员将本部门的现员基础表提交给劳动人事科。")
@@ -173,10 +246,10 @@ public class StaffLedgerController {
         return ApiResponse.success("保存成功", staffLedgerService.saveLedgerDetails(id, request));
     }
 
-    @Operation(summary = "提交台账", description = "考勤管理员提交台账给车间主任审批。")
-    @PostMapping("/{id}/submit")
-    public ApiResponse<LedgerResponse> submitLedger(@PathVariable Long id) {
-        return ApiResponse.success("提交成功", staffLedgerService.submitLedger(id));
+    @Operation(summary = "提交台账", description = "考勤管理员提交台账给车间主任审批，可同时提交在岗人数、备注和变动说明。")
+    @PostMapping("/submit")
+    public ApiResponse<LedgerResponse> submitLedger(@RequestBody(required = false) SubmitLedgerRequest request) {
+        return ApiResponse.success("提交成功", staffLedgerService.submitLedger(request));
     }
 
     @Operation(summary = "提交现员表至人事科", description = "考勤管理员将本部门当月现员表提交给劳动人事科审核。")
@@ -218,7 +291,12 @@ public class StaffLedgerController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);
-        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+        } catch (Exception e) {
+            log.error("导出台账Excel失败, ledgerId={}", id, e);
+            return ResponseEntity.internalServerError()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(("导出失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
     }
 
     @Operation(summary = "导出按班别分列的现员分布台账Excel", description = "按日勤/甲班/乙班/丙班/丁班/预备分列展示员工姓名。")
@@ -230,6 +308,61 @@ public class StaffLedgerController {
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    @Operation(summary = "获取车间台账模板字段", description = "根据车间模板返回该车间需要的字段列表（不同车间班次列不同）。")
+    @GetMapping("/template-fields/{orgUnitId}")
+    public ApiResponse<TemplateFieldsResponse> getTemplateFields(@PathVariable Long orgUnitId) {
+        return ApiResponse.success(ledgerExportService.getTemplateFields(orgUnitId));
+    }
+
+    @Operation(summary = "下载车间台账模板")
+    @GetMapping("/template/download/{orgUnitId}")
+    public ResponseEntity<byte[]> downloadTemplate(@PathVariable Long orgUnitId) {
+        try {
+            byte[] data = ledgerExportService.downloadTemplate(orgUnitId);
+            String filename = URLEncoder.encode("台账模板.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                    .body(data);
+        } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
+    }
+
+    @Operation(summary = "上传车间台账模板", description = "上传新模板替换原有模板，系统自动适配新模板的班次列结构。")
+    @PostMapping("/template/upload/{orgUnitId}")
+    public ApiResponse<Void> uploadTemplate(@PathVariable Long orgUnitId, @RequestParam("file") MultipartFile file) {
+        ledgerExportService.uploadTemplate(orgUnitId, file);
+        return ApiResponse.success("模板上传成功", null);
+    }
+
+    @Operation(summary = "按模板导出台账Excel", description = "使用各车间专属模板填充数据后导出，保留原始模板格式。")
+    @GetMapping("/{id}/template-excel")
+    public ResponseEntity<byte[]> exportLedgerTemplateExcel(@PathVariable Long id) {
+        try {
+            byte[] data = ledgerExportService.fillTemplateExcel(id);
+            String filename = URLEncoder.encode("现员分布台账_模板.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);
+        } catch (Exception e) {
+            log.error("按模板导出台账Excel失败, ledgerId={}", id, e);
+            return ResponseEntity.internalServerError()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(("导出失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    @Operation(summary = "按模板导出台账PDF", description = "按照各车间台账模板的表头结构生成PDF。")
+    @GetMapping("/{id}/template-pdf")
+    public ResponseEntity<byte[]> exportLedgerTemplatePdf(@PathVariable Long id) {
+        try {
+            byte[] data = ledgerExportService.exportLedgerTemplatePdf(id);
+            String filename = URLEncoder.encode("现员分布台账.pdf", StandardCharsets.UTF_8).replace("+", "%20");
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
+                    .contentType(MediaType.APPLICATION_PDF).body(data);
         } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
     }
 

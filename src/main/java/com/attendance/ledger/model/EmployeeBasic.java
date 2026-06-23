@@ -13,6 +13,7 @@ public class EmployeeBasic {
     private String birthDate;
     private Integer age;
     private String workType;
+    private String actualWorkType;
     private String identityType;
     private String categoryMajor;
     private String categoryMinor;
@@ -20,6 +21,7 @@ public class EmployeeBasic {
     private String isTeamLeader;
     private Long orgUnitId;
     private String teamName;
+    private String retirementDate;
     private Integer isActive;
     private String uploadBatch;
     private Integer isDistributed;

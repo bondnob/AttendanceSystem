@@ -19,6 +19,7 @@ public class EmployeeBasicResponse {
     private String birthDate;
     private Integer age;
     private String workType;
+    private String actualWorkType;
     private String identityType;
     private String categoryMajor;
     private String categoryMinor;
@@ -27,6 +28,7 @@ public class EmployeeBasicResponse {
     private Long orgUnitId;
     private String orgUnitName;
     private String teamName;
+    private String retirementDate;
     private Integer isActive;
     private Integer isDistributed;
     private LocalDateTime distributedAt;
