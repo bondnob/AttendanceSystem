@@ -136,6 +136,8 @@ public class LedgerExportService {
             mergeBanBieRow(sheet);
             // 全部填完后统一加内外边框
             addBorders(tplWb, sheet);
+            // 日期行左对齐（addBorders统一居中后再单独设置）
+            setDateLeftAlign(tplWb, sheet);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             tplWb.write(out);
             return out.toByteArray();
@@ -186,6 +188,21 @@ public class LedgerExportService {
         }
         if (banBieCol < 0 || banZhiCol <= banBieCol) return;
         sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, banBieCol, banZhiCol - 1));
+    }
+
+    private void setDateLeftAlign(Workbook wb, Sheet sheet) {
+        Row row1 = sheet.getRow(1);
+        if (row1 == null) return;
+        Cell cell = row1.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return;
+        CellStyle style = wb.createCellStyle();
+        style.setBorderTop(BorderStyle.THIN);
+        style.setBorderBottom(BorderStyle.THIN);
+        style.setBorderLeft(BorderStyle.THIN);
+        style.setBorderRight(BorderStyle.THIN);
+        style.setAlignment(HorizontalAlignment.LEFT);
+        style.setVerticalAlignment(VerticalAlignment.CENTER);
+        cell.setCellStyle(style);
     }
 
     private void addBorders(Workbook wb, Sheet sheet) {
