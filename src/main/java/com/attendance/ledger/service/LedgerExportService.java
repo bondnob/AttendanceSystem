@@ -130,10 +130,30 @@ public class LedgerExportService {
         try (Workbook tplWb = new XSSFWorkbook(new FileInputStream(tplFile))) {
             Sheet sheet = tplWb.getSheetAt(0);
             fillSheetFromTemplate(tplWb, sheet, ledger);
+            // 将第二行（日期行）合并至与表格等宽
+            mergeDateRow(sheet);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             tplWb.write(out);
             return out.toByteArray();
         }
+    }
+
+    private void mergeDateRow(Sheet sheet) {
+        int lastCol = 0;
+        for (int r = 2; r <= 4; r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            if (row.getLastCellNum() - 1 > lastCol) lastCol = row.getLastCellNum() - 1;
+        }
+        if (lastCol <= 1) return;
+        // 移除第二行已有的合并区域
+        for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
+            org.apache.poi.ss.util.CellRangeAddress region = sheet.getMergedRegion(i);
+            if (region.getFirstRow() == 1 && region.getLastRow() == 1) {
+                sheet.removeMergedRegion(i);
+            }
+        }
+        sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(1, 1, 0, lastCol));
     }
 
     private void copySheetContent(Sheet src, Sheet dest) {
