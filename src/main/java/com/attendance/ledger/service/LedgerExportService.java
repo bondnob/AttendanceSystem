@@ -130,15 +130,17 @@ public class LedgerExportService {
         try (Workbook tplWb = new XSSFWorkbook(new FileInputStream(tplFile))) {
             Sheet sheet = tplWb.getSheetAt(0);
             fillSheetFromTemplate(tplWb, sheet, ledger);
-            // 将第二行（日期行）合并至与表格等宽
-            mergeDateRow(sheet);
+            // 第二行写入当月日期并合并至与表格等宽
+            fillDateRow(tplWb, sheet, ledger);
+            // 全部填完后统一加内外边框
+            addBorders(tplWb, sheet);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             tplWb.write(out);
             return out.toByteArray();
         }
     }
 
-    private void mergeDateRow(Sheet sheet) {
+    private void fillDateRow(Workbook wb, Sheet sheet, StaffLedger ledger) {
         int lastCol = 0;
         for (int r = 2; r <= 4; r++) {
             Row row = sheet.getRow(r);
@@ -154,6 +156,37 @@ public class LedgerExportService {
             }
         }
         sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(1, 1, 0, lastCol));
+        // 写入日期
+        String dateText = "日期：";
+        String month = ledger.getLedgerMonth();
+        if (month != null && !month.isBlank()) {
+            try {
+                String[] parts = month.split("-");
+                dateText += Integer.parseInt(parts[0]) + "年" + Integer.parseInt(parts[1]) + "月";
+            } catch (Exception e) { dateText += month; }
+        }
+        Row row1 = sheet.getRow(1);
+        if (row1 == null) row1 = sheet.createRow(1);
+        Cell cell = row1.getCell(0, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+        cell.setCellValue(dateText);
+    }
+
+    private void addBorders(Workbook wb, Sheet sheet) {
+        CellStyle borderStyle = wb.createCellStyle();
+        borderStyle.setBorderTop(BorderStyle.THIN);
+        borderStyle.setBorderBottom(BorderStyle.THIN);
+        borderStyle.setBorderLeft(BorderStyle.THIN);
+        borderStyle.setBorderRight(BorderStyle.THIN);
+        borderStyle.setAlignment(HorizontalAlignment.CENTER);
+        borderStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        for (int r = 0; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            for (int c = 0; c < row.getLastCellNum(); c++) {
+                Cell cell = row.getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                cell.setCellStyle(borderStyle);
+            }
+        }
     }
 
     private void copySheetContent(Sheet src, Sheet dest) {
