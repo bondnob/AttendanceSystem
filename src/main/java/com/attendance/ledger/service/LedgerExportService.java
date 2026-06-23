@@ -213,12 +213,30 @@ public class LedgerExportService {
         borderStyle.setBorderRight(BorderStyle.THIN);
         borderStyle.setAlignment(HorizontalAlignment.CENTER);
         borderStyle.setVerticalAlignment(VerticalAlignment.CENTER);
+        CellStyle noBorderStyle = wb.createCellStyle();
+        noBorderStyle.setBorderTop(BorderStyle.NONE);
+        noBorderStyle.setBorderBottom(BorderStyle.NONE);
+        noBorderStyle.setBorderLeft(BorderStyle.NONE);
+        noBorderStyle.setBorderRight(BorderStyle.NONE);
+        // 找到"备注"行，只给有数据的行加边框
+        int lastDataRow = sheet.getLastRowNum();
         for (int r = 0; r <= sheet.getLastRowNum(); r++) {
             Row row = sheet.getRow(r);
             if (row == null) continue;
+            Cell first = row.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+            if (first != null && first.getCellType() == CellType.STRING
+                    && first.getStringCellValue().trim().contains("备注")) {
+                lastDataRow = r;
+                break;
+            }
+        }
+        for (int r = 0; r <= sheet.getLastRowNum(); r++) {
+            Row row = sheet.getRow(r);
+            if (row == null) continue;
+            CellStyle style = r <= lastDataRow ? borderStyle : noBorderStyle;
             for (int c = 0; c < row.getLastCellNum(); c++) {
                 Cell cell = row.getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
-                cell.setCellStyle(borderStyle);
+                cell.setCellStyle(style);
             }
         }
     }
