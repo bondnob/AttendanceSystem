@@ -373,6 +373,8 @@ public class StaffLedgerService {
             detail.setDingBan2(detailReq.getDingBan2());
             detail.setYuBei1(detailReq.getYuBei1());
             detail.setYuBei2(detailReq.getYuBei2());
+            detail.setYuBei3(detailReq.getYuBei3());
+            detail.setYuBei4(detailReq.getYuBei4());
             detail.setDailyName(detailReq.getDailyName());
             detail.setIdentityType(detailReq.getIdentityType());
             detail.setExtraShiftJson(detailReq.getExtraShiftJson());
@@ -696,6 +698,7 @@ public class StaffLedgerService {
                     .bingBan1(detail.getBingBan1()).bingBan2(detail.getBingBan2())
                     .dingBan1(detail.getDingBan1()).dingBan2(detail.getDingBan2())
                     .yuBei1(detail.getYuBei1()).yuBei2(detail.getYuBei2())
+                    .yuBei3(detail.getYuBei3()).yuBei4(detail.getYuBei4())
                     .dailyName(detail.getDailyName())
                     .extraShiftJson(detail.getExtraShiftJson())
                     .build();
@@ -767,6 +770,8 @@ public class StaffLedgerService {
         detail.setDingBan2(req.getDingBan2());
         detail.setYuBei1(req.getYuBei1());
         detail.setYuBei2(req.getYuBei2());
+        detail.setYuBei3(req.getYuBei3());
+        detail.setYuBei4(req.getYuBei4());
         detail.setDailyName(req.getDailyName());
         detail.setIdentityType(req.getIdentityType());
         detail.setExtraShiftJson(req.getExtraShiftJson());

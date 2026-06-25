@@ -554,8 +554,8 @@ public class LeaveDocumentService {
                 slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true, null));
             }
             if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
-                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true, null));
-                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 410, 454, 478, 388, 426, true, null));
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true, null));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, deputyStationmaster, 410, 454, 478, 388, 426, true, null));
             } else if (isPersonalLeaveOver30Days(detail)) {
                 ApprovalRecordResponse stationmasterApproval = findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长");
                 slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, stationmasterApproval, 176, 220, 244, 388, 426, true, null));

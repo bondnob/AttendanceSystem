@@ -24,6 +24,8 @@ public class StaffLedgerDetail {
     private String dingBan2;
     private String yuBei1;
     private String yuBei2;
+    private String yuBei3;
+    private String yuBei4;
     private String dailyName;
     private String identityType;
     private String extraShiftJson;

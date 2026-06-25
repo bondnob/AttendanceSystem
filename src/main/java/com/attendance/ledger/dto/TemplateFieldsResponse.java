@@ -13,6 +13,9 @@ public class TemplateFieldsResponse {
     /** 模板中的标题（如"运转一车间 现员分布台账"） */
     private String title;
 
+    /** 模板数据区域的实际行数（从数据起始行到"备注"行之前的行数） */
+    private Integer templateRowCount;
+
     /** 该车间模板需要的所有字段 */
     private List<FieldItem> fields;
 
