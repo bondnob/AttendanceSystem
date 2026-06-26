@@ -1019,7 +1019,7 @@ public class LeaveServiceHelper {
         int daysInMonth = startDate.lengthOfMonth();
         BigDecimal monthThreshold = BigDecimal.valueOf(daysInMonth);
 
-        if (leaveDays.compareTo(monthThreshold) >= 0 && leaveDays.compareTo(DAY_60) > 0) {
+        if (leaveDays.compareTo(monthThreshold) >= 0 && leaveDays.compareTo(BigDecimal.valueOf(62)) > 0) {
             throw new BizException("特殊情况单次事假原则上不得超过2个月");
         }
 

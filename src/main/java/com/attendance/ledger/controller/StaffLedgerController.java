@@ -330,11 +330,13 @@ public class StaffLedgerController {
         } catch (Exception e) { return ResponseEntity.internalServerError().build(); }
     }
 
-    @Operation(summary = "上传车间台账模板", description = "上传新模板替换原有模板，系统自动适配新模板的班次列结构。")
+    @Operation(summary = "导入台账数据", description = "按照台账模板填写好的Excel上传，系统解析数据并写入台账明细。")
     @PostMapping("/template/upload/{orgUnitId}")
-    public ApiResponse<Void> uploadTemplate(@PathVariable Long orgUnitId, @RequestParam("file") MultipartFile file) {
-        ledgerExportService.uploadTemplate(orgUnitId, file);
-        return ApiResponse.success("模板上传成功", null);
+    public ApiResponse<Void> importLedgerData(@PathVariable Long orgUnitId,
+                                              @RequestParam("file") MultipartFile file,
+                                              @RequestParam(required = false) String month) {
+        staffLedgerService.importLedgerData(orgUnitId, file, month);
+        return ApiResponse.success("台账数据导入成功", null);
     }
 
     @Operation(summary = "按模板导出台账Excel", description = "使用各车间专属模板填充数据后导出，保留原始模板格式。")

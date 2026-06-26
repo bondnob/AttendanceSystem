@@ -55,6 +55,7 @@ public class LeaveDocumentService {
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private static final DateTimeFormatter FILE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final String EMPLOYEE_TEMPLATE = "docs/职工请假记录单.pdf";
+    private static final String EMPLOYEE_SICK_OVER_30_TEMPLATE = "docs/职工请假记录单病假三十天以上.pdf";
     private static final String EMPLOYEE_PERSONAL_OVER_30_TEMPLATE = "docs/职工请假记录单事假三十天以上.pdf";
     private static final String CADRE_TEMPLATE = "docs/管理人员请假记录单.pdf";
     private static final float DECISION_FONT_SIZE = 16f;
@@ -296,7 +297,13 @@ public class LeaveDocumentService {
     private Path resolveTemplatePath(LeaveDetailResponse detail) {
         String relativePath;
         if (usesEmployeePdfLayout(detail)) {
-            relativePath = isPersonalLeaveOver30Days(detail) ? EMPLOYEE_PERSONAL_OVER_30_TEMPLATE : EMPLOYEE_TEMPLATE;
+            if (isSickLeaveOver30Days(detail)) {
+                relativePath = EMPLOYEE_SICK_OVER_30_TEMPLATE;
+            } else if (isPersonalLeaveOver30Days(detail)) {
+                relativePath = EMPLOYEE_PERSONAL_OVER_30_TEMPLATE;
+            } else {
+                relativePath = EMPLOYEE_TEMPLATE;
+            }
         } else {
             relativePath = CADRE_TEMPLATE;
         }
@@ -553,7 +560,10 @@ public class LeaveDocumentService {
                 slots.add(new ApprovalSlot(67, 541, 295, 463, "", teamLeaderDate, null, 176, 220, 244, 467, 505, false, detail.getTeamLeaderSignatureUrl()));
                 slots.add(new ApprovalSlot(296, 541, 528, 463, "", null, orgPrincipal, 410, 454, 478, 467, 505, true, null));
             }
-            if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
+            if (isSickLeaveOver30Days(detail)) {
+                slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, deputyStationmaster, 176, 220, 244, 388, 426, true, null));
+                slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, findApprovalByRoleOrName(approvals, "STATIONMASTER", "站长"), 410, 454, 478, 388, 426, true, null));
+            } else if (shouldPlaceUnitLeaderInStationmasterSlot(detail) && deputyStationmaster != null) {
                 slots.add(new ApprovalSlot(67, 463, 295, 384, "", null, findApprovalByRole(approvals, "HR_SECTION_CHIEF"), 176, 220, 244, 388, 426, true, null));
                 slots.add(new ApprovalSlot(296, 463, 528, 384, "", null, deputyStationmaster, 410, 454, 478, 388, 426, true, null));
             } else if (isPersonalLeaveOver30Days(detail)) {

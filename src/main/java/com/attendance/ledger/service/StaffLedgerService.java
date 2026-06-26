@@ -36,6 +36,7 @@ import com.attendance.ledger.model.StaffLedgerDetail;
 import com.attendance.leave.enums.RoleCode;
 import com.attendance.leave.mapper.UserAccountMapper;
 import com.attendance.leave.model.UserAccount;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
@@ -333,6 +334,173 @@ public class StaffLedgerService {
 
         return buildLedgerResponse(ledger);
     }
+
+    @Transactional
+    public void importLedgerData(Long orgUnitId, MultipartFile file, String month) {
+        requireLogin();
+        String effectiveMonth = month != null ? month : LocalDate.now().format(MONTH_FMT);
+        StaffLedger ledger = staffLedgerMapper.findByOrgUnitAndMonth(orgUnitId, effectiveMonth);
+        if (ledger == null) throw new BizException("台账不存在，请先同步");
+
+        try (Workbook wb = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = wb.getSheetAt(0);
+
+            // 解析第3行（0-indexed=2）获取班次列位置和名称
+            Row row3 = sheet.getRow(2);
+            List<int[]> shiftPositions = new ArrayList<>();
+            List<String> shiftNames = new ArrayList<>();
+            if (row3 != null) {
+                for (int i = 3; i <= 25; i++) {
+                    Cell c = row3.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                    if (c == null || c.getCellType() != CellType.STRING || c.getStringCellValue().isBlank()) continue;
+                    shiftPositions.add(new int[]{i});
+                    shiftNames.add(c.getStringCellValue().trim());
+                }
+            }
+
+            // 标准班次到字段的映射
+            Map<String, String> stdMap = new LinkedHashMap<>();
+            stdMap.put("甲班", "jiaBan"); stdMap.put("乙班", "yiBan");
+            stdMap.put("丙班", "bingBan"); stdMap.put("丁班", "dingBan");
+            stdMap.put("预备", "yuBei"); stdMap.put("半班", "yuBei");
+            boolean hasYuBei = shiftNames.stream().anyMatch(n -> n.contains("预备"));
+
+            // 计算每个班次的列跨度
+            Row subRow = sheet.getRow(4);
+            List<ShiftInfo> shifts = new ArrayList<>();
+            for (int idx = 0; idx < shiftNames.size(); idx++) {
+                String name = shiftNames.get(idx);
+                int colStart = shiftPositions.get(idx)[0];
+                int span = 1;
+                // 非最后一个班次：用下一个班次起始列推算跨度
+                if (idx + 1 < shiftPositions.size()) {
+                    span = shiftPositions.get(idx + 1)[0] - colStart;
+                }
+                // 预备/最后一个班次：检测合并单元格和"姓名"子列数
+                if (idx == shiftPositions.size() - 1 || name.contains("预备")) {
+                    int colEnd = (idx + 1 < shiftPositions.size()) ? shiftPositions.get(idx + 1)[0] - 1 : 25;
+                    if (subRow != null) {
+                        for (int mr = 0; mr < sheet.getNumMergedRegions(); mr++) {
+                            org.apache.poi.ss.util.CellRangeAddress region = sheet.getMergedRegion(mr);
+                            if (region.getFirstRow() == subRow.getRowNum()
+                                    && region.getFirstColumn() >= colStart
+                                    && region.getFirstColumn() <= colEnd) {
+                                int mSpan = region.getLastColumn() - region.getFirstColumn() + 1;
+                                if (mSpan > span) span = mSpan;
+                            }
+                        }
+                        int cnt = 0;
+                        for (int c2 = colStart; c2 <= colEnd; c2++) {
+                            Cell sc = subRow.getCell(c2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                            if (sc != null && sc.getCellType() == CellType.STRING
+                                    && "姓名".equals(sc.getStringCellValue().trim())) cnt++;
+                        }
+                        if (cnt > span) span = cnt;
+                    }
+                }
+
+                String fieldKey = null;
+                for (Map.Entry<String, String> e : stdMap.entrySet()) {
+                    if (name.contains(e.getKey()) && !(e.getKey().equals("半班") && hasYuBei)) {
+                        fieldKey = e.getValue(); break;
+                    }
+                }
+                shifts.add(new ShiftInfo(colStart, span, name, fieldKey));
+            }
+
+            // 查找固定列位置
+            int shiftCatCol = -1, dailyCol = -1, identityCol = -1;
+            if (row3 != null) {
+                for (int i = 3; i <= 25; i++) {
+                    Cell c = row3.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                    if (c == null || c.getCellType() != CellType.STRING) continue;
+                    String v = c.getStringCellValue().trim();
+                    if (v.equals("班制")) shiftCatCol = i;
+                    else if (v.equals("日勤")) dailyCol = i;
+                    else if (v.equals("职务")) identityCol = i;
+                }
+            }
+
+            // 删除旧明细并解析数据行
+            staffLedgerDetailMapper.deleteByLedgerId(ledger.getId());
+            List<StaffLedgerDetail> details = new ArrayList<>();
+            int sortNo = 0;
+            ObjectMapper om = new ObjectMapper();
+
+            for (int r = 5; r <= sheet.getLastRowNum(); r++) {
+                Row row = sheet.getRow(r);
+                if (row == null) continue;
+                String station = readCell(row, 0);
+                String teamName = readCell(row, 1);
+                String workType = readCell(row, 2);
+                if (station == null && teamName == null && workType == null) continue;
+
+                // 读取每个班次的姓名值
+                List<String[]> shiftValues = new ArrayList<>();
+                for (ShiftInfo s : shifts) {
+                    String[] vals = new String[s.span];
+                    for (int i = 0; i < s.span; i++) {
+                        vals[i] = readCell(row, s.colStart + i);
+                    }
+                    shiftValues.add(vals);
+                }
+
+                Map<String, String[]> extraShifts = new LinkedHashMap<>();
+                StaffLedgerDetail detail = new StaffLedgerDetail();
+                detail.setLedgerId(ledger.getId());
+                detail.setStationPoint(station);
+                detail.setTeamName(teamName);
+                detail.setWorkType(workType);
+                detail.setSortNo(sortNo++);
+
+                for (int si = 0; si < shifts.size(); si++) {
+                    ShiftInfo s = shifts.get(si);
+                    String[] vals = shiftValues.get(si);
+                    if (s.fieldKey != null) {
+                        switch (s.fieldKey) {
+                            case "jiaBan" -> { detail.setJiaBan1(vals[0]); if (vals.length > 1) detail.setJiaBan2(vals[1]); }
+                            case "yiBan" -> { detail.setYiBan1(vals[0]); if (vals.length > 1) detail.setYiBan2(vals[1]); }
+                            case "bingBan" -> { detail.setBingBan1(vals[0]); if (vals.length > 1) detail.setBingBan2(vals[1]); }
+                            case "dingBan" -> { detail.setDingBan1(vals[0]); if (vals.length > 1) detail.setDingBan2(vals[1]); }
+                            case "yuBei" -> {
+                                detail.setYuBei1(vals[0]);
+                                if (vals.length > 1) detail.setYuBei2(vals[1]);
+                                if (vals.length > 2) detail.setYuBei3(vals[2]);
+                                if (vals.length > 3) detail.setYuBei4(vals[3]);
+                            }
+                        }
+                    } else {
+                        extraShifts.put(s.name, vals);
+                    }
+                }
+
+                if (!extraShifts.isEmpty()) {
+                    detail.setExtraShiftJson(om.writeValueAsString(extraShifts));
+                }
+                if (shiftCatCol >= 0) detail.setShiftCategory(readCell(row, shiftCatCol));
+                if (dailyCol >= 0) detail.setDailyName(readCell(row, dailyCol));
+                if (identityCol >= 0) detail.setIdentityType(readCell(row, identityCol));
+
+                details.add(detail);
+            }
+
+            if (!details.isEmpty()) staffLedgerDetailMapper.batchInsert(details);
+        } catch (BizException e) { throw e;
+        } catch (Exception e) { throw new BizException("台账Excel导入失败: " + e.getMessage()); }
+    }
+
+    private String readCell(Row row, int col) {
+        Cell cell = row.getCell(col, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+        if (cell == null) return null;
+        if (cell.getCellType() == CellType.STRING) {
+            String v = cell.getStringCellValue().trim();
+            return v.isEmpty() ? null : v;
+        }
+        if (cell.getCellType() == CellType.NUMERIC) return String.valueOf((long) cell.getNumericCellValue());
+        return null;
+    }
+
+    private record ShiftInfo(int colStart, int span, String name, String fieldKey) {}
 
     public LedgerResponse getMyLedger(String month) {
         CurrentUser currentUser = requireLogin();
