@@ -19,6 +19,7 @@ import com.attendance.ledger.dto.LedgerPendingResponse;
 import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerDetailRequest;
 import com.attendance.ledger.dto.SaveLedgerRequest;
+import com.attendance.ledger.dto.ShareLedgerRequest;
 import com.attendance.ledger.dto.SubmitLedgerRequest;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
 import com.attendance.ledger.mapper.EmployeeBasicMapper;
@@ -46,6 +47,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +78,12 @@ public class StaffLedgerService {
     private static final String STEP_DIRECTOR = "DIRECTOR";
     private static final String STEP_HR = "HR";
     private static final DateTimeFormatter MONTH_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
+    private static final Set<String> SHAREABLE_LEADER_ROLES = Set.of(
+            RoleCode.HR_SECTION_CHIEF,
+            RoleCode.STATIONMASTER,
+            RoleCode.DEPUTY_STATIONMASTER,
+            RoleCode.PARTY_SECRETARY
+    );
 
     private final EmployeeBasicMapper employeeBasicMapper;
     private final EmployeeBasicSubmissionMapper employeeBasicSubmissionMapper;
@@ -510,8 +518,23 @@ public class StaffLedgerService {
     }
 
     public LedgerResponse getLedgerById(Long ledgerId) {
-        requireLogin();
-        return buildLedgerResponse(requireLedger(ledgerId));
+        CurrentUser currentUser = requireLogin();
+        StaffLedger ledger = requireLedger(ledgerId);
+
+        // 超级管理员和人事科管理员可直接查看
+        if (isSystemAdmin(currentUser) || isHrAdmin(currentUser)) {
+            return buildLedgerResponse(ledger);
+        }
+        // 台账所属部门可查看
+        if (ledger.getOrgUnitId().equals(currentUser.getOrgUnitId())) {
+            return buildLedgerResponse(ledger);
+        }
+        // 被共享的领导可查看
+        if (isSharedToUser(ledger.getSharedUserIds(), currentUser.getUserId())) {
+            return buildLedgerResponse(ledger);
+        }
+
+        throw new BizException("无权查看该台账");
     }
 
     @Transactional
@@ -821,10 +844,118 @@ public class StaffLedgerService {
             return AttendanceAdminResponse.builder()
                     .userId(a.getId())
                     .empName(a.getEmpName())
+                    .roleName(a.getRoleName())
                     .orgUnitId(a.getOrgUnitId())
                     .orgUnitName(org != null ? org.getOrgName() : "")
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    public List<AttendanceAdminResponse> getShareableLeaders() {
+        requireLogin();
+        List<UserAccount> leaders = new ArrayList<>();
+        for (String roleCode : SHAREABLE_LEADER_ROLES) {
+            leaders.addAll(userAccountMapper.findEnabledByRole(roleCode));
+        }
+        return leaders.stream().map(a -> {
+            OrgUnit org = orgUnitMapper.findById(a.getOrgUnitId());
+            return AttendanceAdminResponse.builder()
+                    .userId(a.getId())
+                    .empName(a.getEmpName())
+                    .roleName(a.getRoleName())
+                    .orgUnitId(a.getOrgUnitId())
+                    .orgUnitName(org != null ? org.getOrgName() : "")
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    // ==================== 台账共享相关 ====================
+
+    @Transactional
+    public void shareLedger(ShareLedgerRequest request) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以共享台账");
+        }
+
+        for (Long ledgerId : request.getLedgerIds()) {
+            StaffLedger ledger = requireLedger(ledgerId);
+            List<String> currentIds = parseSharedUserIds(ledger.getSharedUserIds());
+            for (Long targetUserId : request.getTargetUserIds()) {
+                UserAccount targetUser = userAccountMapper.findById(targetUserId);
+                if (targetUser == null) throw new BizException("用户不存在: " + targetUserId);
+                if (!SHAREABLE_LEADER_ROLES.contains(targetUser.getRoleCode())) {
+                    throw new BizException("只能共享给领导角色: " + targetUser.getEmpName());
+                }
+                String idStr = String.valueOf(targetUserId);
+                if (!currentIds.contains(idStr)) {
+                    currentIds.add(idStr);
+                }
+            }
+            ledger.setSharedUserIds(String.join(",", currentIds));
+            staffLedgerMapper.updateSharedUserIds(ledger);
+        }
+    }
+
+    @Transactional
+    public void revokeSharing(Long ledgerId, Long targetUserId) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以撤销共享");
+        }
+        StaffLedger ledger = requireLedger(ledgerId);
+        List<String> currentIds = parseSharedUserIds(ledger.getSharedUserIds());
+        currentIds.remove(String.valueOf(targetUserId));
+        ledger.setSharedUserIds(currentIds.isEmpty() ? null : String.join(",", currentIds));
+        staffLedgerMapper.updateSharedUserIds(ledger);
+    }
+
+    public PageResponse<LedgerPendingResponse> getSharedLedgersForLeader(
+            String status, Integer pageNum, Integer pageSize) {
+        CurrentUser currentUser = requireLogin();
+        int safePageNum = pageNum == null || pageNum < 1 ? 1 : pageNum;
+        int safePageSize = pageSize == null || pageSize < 1 ? 10 : Math.min(pageSize, 100);
+
+        List<StaffLedger> allShared = staffLedgerMapper.findBySharedUserId(currentUser.getUserId());
+        if (status != null && !status.isBlank()) {
+            allShared = allShared.stream()
+                    .filter(l -> status.equals(l.getStatus()))
+                    .collect(Collectors.toList());
+        }
+        long total = allShared.size();
+        int fromIndex = (safePageNum - 1) * safePageSize;
+        int toIndex = Math.min(fromIndex + safePageSize, allShared.size());
+        List<LedgerPendingResponse> records = (fromIndex < total
+                ? allShared.subList(fromIndex, toIndex) : List.<StaffLedger>of())
+                .stream().map(l -> {
+                    OrgUnit org = orgUnitMapper.findById(l.getOrgUnitId());
+                    UserAccount creator = userAccountMapper.findById(l.getCreatedBy());
+                    return LedgerPendingResponse.builder()
+                            .id(l.getId()).orgUnitId(l.getOrgUnitId())
+                            .orgUnitName(org != null ? org.getOrgName() : "")
+                            .ledgerMonth(l.getLedgerMonth()).status(l.getStatus())
+                            .inWorkCount(l.getInWorkCount())
+                            .creatorName(creator != null ? creator.getEmpName() : "")
+                            .submittedAt(l.getSubmittedAt()).updatedAt(l.getUpdatedAt())
+                            .build();
+                }).collect(Collectors.toList());
+
+        return PageResponse.<LedgerPendingResponse>builder()
+                .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records).build();
+    }
+
+    private List<String> parseSharedUserIds(String sharedUserIds) {
+        if (sharedUserIds == null || sharedUserIds.isBlank()) return new ArrayList<>();
+        return new ArrayList<>(List.of(sharedUserIds.split(",")));
+    }
+
+    private boolean isSharedToUser(String sharedUserIds, Long userId) {
+        if (sharedUserIds == null || sharedUserIds.isBlank()) return false;
+        String target = String.valueOf(userId);
+        for (String id : sharedUserIds.split(",")) {
+            if (target.equals(id.trim())) return true;
+        }
+        return false;
     }
 
     // ==================== 辅助方法 ====================
@@ -886,6 +1017,7 @@ public class StaffLedgerService {
                 .hrOpinion(ledger.getHrOpinion()).hrApprovedAt(ledger.getHrApprovedAt())
                 .submittedAt(ledger.getSubmittedAt()).createdBy(ledger.getCreatedBy())
                 .creatorName(creator != null ? creator.getEmpName() : "")
+                .sharedUserIds(ledger.getSharedUserIds())
                 .createdAt(ledger.getCreatedAt()).updatedAt(ledger.getUpdatedAt())
                 .details(detailResponses).nonWorkingDetails(nonWorkingResponses)
                 .approvalRecords(records.stream().map(r -> {

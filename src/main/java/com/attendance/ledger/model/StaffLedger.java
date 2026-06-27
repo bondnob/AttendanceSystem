@@ -19,6 +19,7 @@ public class StaffLedger {
     private Long hrUserId;
     private String hrOpinion;
     private LocalDateTime hrApprovedAt;
+    private String sharedUserIds;
     private LocalDateTime submittedAt;
     private Long createdBy;
     private LocalDateTime createdAt;

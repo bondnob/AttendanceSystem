@@ -13,6 +13,7 @@ public class AttendanceAdminResponse {
 
     private Long userId;
     private String empName;
+    private String roleName;
     private Long orgUnitId;
     private String orgUnitName;
 }

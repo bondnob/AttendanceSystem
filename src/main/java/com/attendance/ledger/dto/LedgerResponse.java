@@ -33,6 +33,7 @@ public class LedgerResponse {
     private LocalDateTime submittedAt;
     private Long createdBy;
     private String creatorName;
+    private String sharedUserIds;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

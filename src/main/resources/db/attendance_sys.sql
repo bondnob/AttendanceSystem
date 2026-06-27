@@ -1523,6 +1523,7 @@ CREATE TABLE `staff_ledger`  (
   `hr_user_id` bigint NULL DEFAULT NULL COMMENT '审核人事科ID',
   `hr_opinion` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL COMMENT '人事科审核意见',
   `hr_approved_at` datetime NULL DEFAULT NULL COMMENT '人事科审核时间',
+  `shared_user_ids` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '共享领导用户ID(逗号分隔)',
   `submitted_at` datetime NULL DEFAULT NULL COMMENT '提交时间',
   `created_by` bigint NOT NULL COMMENT '创建人ID',
   `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -1537,8 +1538,8 @@ CREATE TABLE `staff_ledger`  (
 -- ----------------------------
 -- Records of staff_ledger
 -- ----------------------------
-INSERT INTO `staff_ledger` VALUES (4, 10, '2026-06', 'SUBMITTED', 3, '', NULL, 19, '很好', '2026-06-17 18:24:44', 6, '', '2026-06-17 18:37:41', '2026-06-21 20:44:16', 18, '2026-06-17 11:15:36', '2026-06-21 20:44:16');
-INSERT INTO `staff_ledger` VALUES (5, 11, '2026-06', 'SUBMITTED', NULL, '312', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-06-17 17:21:55', 20, '2026-06-17 11:21:36', '2026-06-17 17:21:54');
+INSERT INTO `staff_ledger` VALUES (4, 10, '2026-06', 'SUBMITTED', 3, '', NULL, 19, '很好', '2026-06-17 18:24:44', 6, '', '2026-06-17 18:37:41', NULL, '2026-06-21 20:44:16', 18, '2026-06-17 11:15:36', '2026-06-21 20:44:16');
+INSERT INTO `staff_ledger` VALUES (5, 11, '2026-06', 'SUBMITTED', NULL, '312', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '2026-06-17 17:21:55', 20, '2026-06-17 11:21:36', '2026-06-17 17:21:54');
 
 -- ----------------------------
 -- Table structure for staff_ledger_detail

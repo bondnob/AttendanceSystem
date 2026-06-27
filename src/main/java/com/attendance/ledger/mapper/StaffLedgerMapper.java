@@ -22,7 +22,7 @@ public interface StaffLedgerMapper {
     @Select("""
             SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,
                 director_user_id, director_opinion, director_approved_at,
-                hr_user_id, hr_opinion, hr_approved_at,
+                hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,
                 submitted_at, created_by, created_at, updated_at
             FROM staff_ledger WHERE id = #{id}
             """)
@@ -31,7 +31,7 @@ public interface StaffLedgerMapper {
     @Select("""
             SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,
                 director_user_id, director_opinion, director_approved_at,
-                hr_user_id, hr_opinion, hr_approved_at,
+                hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,
                 submitted_at, created_by, created_at, updated_at
             FROM staff_ledger
             WHERE org_unit_id = #{orgUnitId} AND ledger_month = #{ledgerMonth}
@@ -42,7 +42,7 @@ public interface StaffLedgerMapper {
             <script>
             SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,
                 director_user_id, director_opinion, director_approved_at,
-                hr_user_id, hr_opinion, hr_approved_at,
+                hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,
                 submitted_at, created_by, created_at, updated_at
             FROM staff_ledger
             <if test="status != null">
@@ -62,7 +62,7 @@ public interface StaffLedgerMapper {
     @Select("""
             SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,
                 director_user_id, director_opinion, director_approved_at,
-                hr_user_id, hr_opinion, hr_approved_at,
+                hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,
                 submitted_at, created_by, created_at, updated_at
             FROM staff_ledger WHERE status = #{status} ORDER BY updated_at DESC
             """)
@@ -80,7 +80,7 @@ public interface StaffLedgerMapper {
     @Select({"<script>",
             "SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,",
             "    director_user_id, director_opinion, director_approved_at,",
-            "    hr_user_id, hr_opinion, hr_approved_at,",
+            "    hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,",
             "    submitted_at, created_by, created_at, updated_at",
             "FROM staff_ledger",
             "<where>",
@@ -137,4 +137,22 @@ public interface StaffLedgerMapper {
             WHERE id = #{id}
             """)
     int resetForSync(StaffLedger ledger);
+
+    @Update("""
+            UPDATE staff_ledger
+            SET shared_user_ids = #{sharedUserIds}, updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{id}
+            """)
+    int updateSharedUserIds(StaffLedger ledger);
+
+    @Select("""
+            SELECT id, org_unit_id, ledger_month, status, in_work_count, remark, change_description,
+                director_user_id, director_opinion, director_approved_at,
+                hr_user_id, hr_opinion, hr_approved_at, shared_user_ids,
+                submitted_at, created_by, created_at, updated_at
+            FROM staff_ledger
+            WHERE FIND_IN_SET(#{userId}, shared_user_ids) > 0
+            ORDER BY updated_at DESC
+            """)
+    List<StaffLedger> findBySharedUserId(@Param("userId") Long userId);
 }

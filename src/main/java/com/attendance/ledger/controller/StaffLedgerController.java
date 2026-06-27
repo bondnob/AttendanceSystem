@@ -13,6 +13,7 @@ import com.attendance.ledger.dto.LedgerMonthCompareResponse;
 import com.attendance.ledger.dto.LedgerPendingResponse;
 import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerRequest;
+import com.attendance.ledger.dto.ShareLedgerRequest;
 import com.attendance.ledger.dto.SubmitLedgerRequest;
 import com.attendance.ledger.dto.TemplateFieldsResponse;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
@@ -36,6 +37,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -230,6 +232,37 @@ public class StaffLedgerController {
     @GetMapping("/attendance-admins")
     public ApiResponse<List<AttendanceAdminResponse>> getAllAttendanceAdmins() {
         return ApiResponse.success(staffLedgerService.getAllAttendanceAdmins());
+    }
+
+    @Operation(summary = "获取可共享的领导列表", description = "返回劳动人事科科长、正职领导、副职领导、党委书记。")
+    @GetMapping("/leaders")
+    public ApiResponse<List<AttendanceAdminResponse>> getShareableLeaders() {
+        return ApiResponse.success(staffLedgerService.getShareableLeaders());
+    }
+
+    // ==================== 台账共享相关 ====================
+
+    @Operation(summary = "共享台账给领导", description = "劳动人事科将台账共享给指定领导，支持单选和多选。")
+    @PostMapping("/share")
+    public ApiResponse<Void> shareLedger(@Valid @RequestBody ShareLedgerRequest request) {
+        staffLedgerService.shareLedger(request);
+        return ApiResponse.success("共享成功", null);
+    }
+
+    @Operation(summary = "查看我被共享的台账列表", description = "领导查看自己被共享的所有台账，支持按状态筛选和分页。")
+    @GetMapping("/shared-with-me")
+    public ApiResponse<PageResponse<LedgerPendingResponse>> getSharedLedgers(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false, defaultValue = "1") Integer pageNum,
+            @RequestParam(required = false, defaultValue = "10") Integer pageSize) {
+        return ApiResponse.success(staffLedgerService.getSharedLedgersForLeader(status, pageNum, pageSize));
+    }
+
+    @Operation(summary = "撤销台账共享", description = "劳动人事科撤销对指定领导的台账共享。")
+    @DeleteMapping("/share")
+    public ApiResponse<Void> revokeSharing(@RequestParam Long ledgerId, @RequestParam Long targetUserId) {
+        staffLedgerService.revokeSharing(ledgerId, targetUserId);
+        return ApiResponse.success("撤销成功", null);
     }
 
     // ==================== 动态路径接口（/{id} 放在最后） ====================
