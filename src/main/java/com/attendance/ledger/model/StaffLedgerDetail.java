@@ -22,6 +22,8 @@ public class StaffLedgerDetail {
     private String bingBan2;
     private String dingBan1;
     private String dingBan2;
+    private String banBan1;
+    private String banBan2;
     private String yuBei1;
     private String yuBei2;
     private String yuBei3;

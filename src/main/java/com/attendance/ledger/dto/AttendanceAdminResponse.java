@@ -14,6 +14,7 @@ public class AttendanceAdminResponse {
     private Long userId;
     private String empName;
     private String roleName;
+    private String roleCode;
     private Long orgUnitId;
     private String orgUnitName;
 }

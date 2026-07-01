@@ -278,4 +278,68 @@ public interface EmployeeBasicMapper {
             </script>
             """)
     int batchInsert(@Param("list") List<EmployeeBasic> employees);
+
+    @Select("""
+            <script>
+            SELECT COUNT(1) FROM employee_basic
+            WHERE org_unit_id IN
+            <foreach collection="orgUnitIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND is_distributed = 1
+            </script>
+            """)
+    Long countByOrgUnitIds(@Param("orgUnitIds") List<Long> orgUnitIds);
+
+    @Select("""
+            <script>
+            SELECT id, id_card_no, emp_name, gender, birth_date, age, work_type,
+                actual_work_type, identity_type, category_major, category_minor, labor_shift,
+                is_team_leader, org_unit_id, team_name, is_active, upload_batch, is_distributed,
+                distributed_at, retirement_date, created_at, updated_at
+            FROM employee_basic
+            WHERE org_unit_id IN
+            <foreach collection="orgUnitIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND is_distributed = 1
+            ORDER BY org_unit_id, id ASC
+            LIMIT #{offset}, #{pageSize}
+            </script>
+            """)
+    List<EmployeeBasic> findByOrgUnitIdsWithPage(@Param("orgUnitIds") List<Long> orgUnitIds,
+                                                  @Param("offset") int offset,
+                                                  @Param("pageSize") int pageSize);
+
+    @Select("""
+            <script>
+            SELECT COUNT(1) FROM employee_basic
+            WHERE org_unit_id IN
+            <foreach collection="orgUnitIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND is_distributed = 1
+            <if test="categoryMajor != null and categoryMajor != ''"> AND category_major LIKE CONCAT('%', #{categoryMajor}, '%')</if>
+            <if test="retirementAge != null"> AND age &gt;= #{retirementAge}</if>
+            </script>
+            """)
+    Long countFilteredByOrgUnitIds(@Param("orgUnitIds") List<Long> orgUnitIds,
+                                    @Param("categoryMajor") String categoryMajor,
+                                    @Param("retirementAge") Integer retirementAge);
+
+    @Select("""
+            <script>
+            SELECT id, id_card_no, emp_name, gender, birth_date, age, work_type,
+                actual_work_type, identity_type, category_major, category_minor, labor_shift,
+                is_team_leader, org_unit_id, team_name, is_active, upload_batch, is_distributed,
+                distributed_at, retirement_date, created_at, updated_at
+            FROM employee_basic
+            WHERE org_unit_id IN
+            <foreach collection="orgUnitIds" item="id" open="(" separator="," close=")">#{id}</foreach>
+            AND is_distributed = 1
+            <if test="categoryMajor != null and categoryMajor != ''"> AND category_major LIKE CONCAT('%', #{categoryMajor}, '%')</if>
+            <if test="retirementAge != null"> AND age &gt;= #{retirementAge}</if>
+            ORDER BY org_unit_id, id ASC
+            LIMIT #{offset}, #{pageSize}
+            </script>
+            """)
+    List<EmployeeBasic> findFilteredByOrgUnitIdsWithPage(@Param("orgUnitIds") List<Long> orgUnitIds,
+                                                          @Param("categoryMajor") String categoryMajor,
+                                                          @Param("retirementAge") Integer retirementAge,
+                                                          @Param("offset") int offset,
+                                                          @Param("pageSize") int pageSize);
 }

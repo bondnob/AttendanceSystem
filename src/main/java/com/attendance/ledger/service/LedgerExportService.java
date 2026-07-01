@@ -145,7 +145,9 @@ public class LedgerExportService {
             mergeBanBieRow(sheet);
             // 全部填完后统一加内外边框
             addBorders(tplWb, sheet);
-            // 日期行左对齐（addBorders统一居中后再单独设置）
+            // 确保标题行和日期行没有边框（模板可能自带边框样式）
+            clearTitleBorders(tplWb, sheet);
+            // 日期行左对齐
             setDateLeftAlign(tplWb, sheet);
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             tplWb.write(out);
@@ -196,6 +198,14 @@ public class LedgerExportService {
             else if (v.equals("班制")) banZhiCol = i;
         }
         if (banBieCol < 0 || banZhiCol <= banBieCol) return;
+        // 移除第2行已有的合并区域，避免重复添加
+        for (int i = sheet.getNumMergedRegions() - 1; i >= 0; i--) {
+            org.apache.poi.ss.util.CellRangeAddress region = sheet.getMergedRegion(i);
+            if (region.getFirstRow() == 2 && region.getLastRow() == 2
+                    && region.getFirstColumn() >= banBieCol && region.getLastColumn() < banZhiCol) {
+                sheet.removeMergedRegion(i);
+            }
+        }
         sheet.addMergedRegion(new org.apache.poi.ss.util.CellRangeAddress(2, 2, banBieCol, banZhiCol - 1));
     }
 
@@ -205,13 +215,45 @@ public class LedgerExportService {
         Cell cell = row1.getCell(0, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
         if (cell == null) return;
         CellStyle style = wb.createCellStyle();
-        style.setBorderTop(BorderStyle.THIN);
-        style.setBorderBottom(BorderStyle.THIN);
-        style.setBorderLeft(BorderStyle.THIN);
-        style.setBorderRight(BorderStyle.THIN);
+        style.setBorderTop(BorderStyle.NONE);
+        style.setBorderBottom(BorderStyle.NONE);
+        style.setBorderLeft(BorderStyle.NONE);
+        style.setBorderRight(BorderStyle.NONE);
         style.setAlignment(HorizontalAlignment.LEFT);
         style.setVerticalAlignment(VerticalAlignment.CENTER);
         cell.setCellStyle(style);
+    }
+
+    private void clearTitleBorders(Workbook wb, Sheet sheet) {
+        CellStyle noBorder = wb.createCellStyle();
+        noBorder.setBorderTop(BorderStyle.NONE);
+        noBorder.setBorderBottom(BorderStyle.NONE);
+        noBorder.setBorderLeft(BorderStyle.NONE);
+        noBorder.setBorderRight(BorderStyle.NONE);
+        noBorder.setFillPattern(FillPatternType.NO_FILL);
+        noBorder.setAlignment(HorizontalAlignment.CENTER);
+        noBorder.setVerticalAlignment(VerticalAlignment.CENTER);
+        Row row0 = sheet.getRow(0);
+        if (row0 != null) {
+            for (int c = 0; c < row0.getLastCellNum(); c++) {
+                Cell cell = row0.getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                cell.setCellStyle(noBorder);
+            }
+        }
+        // 第二行（日期行）只清边框，对齐由 setDateLeftAlign 单独设置
+        CellStyle noBorderDate = wb.createCellStyle();
+        noBorderDate.setBorderTop(BorderStyle.NONE);
+        noBorderDate.setBorderBottom(BorderStyle.NONE);
+        noBorderDate.setBorderLeft(BorderStyle.NONE);
+        noBorderDate.setBorderRight(BorderStyle.NONE);
+        noBorderDate.setFillPattern(FillPatternType.NO_FILL);
+        Row row1 = sheet.getRow(1);
+        if (row1 != null) {
+            for (int c = 0; c < row1.getLastCellNum(); c++) {
+                Cell cell = row1.getCell(c, Row.MissingCellPolicy.CREATE_NULL_AS_BLANK);
+                cell.setCellStyle(noBorderDate);
+            }
+        }
     }
 
     private void addBorders(Workbook wb, Sheet sheet) {
@@ -380,31 +422,35 @@ public class LedgerExportService {
             for (int idx = 0; idx < shiftNames.size(); idx++) {
                 String name = shiftNames.get(idx);
                 int colStart = shiftPositions.get(idx)[0];
-                int colEnd = (idx + 1 < shiftPositions.size()) ? shiftPositions.get(idx + 1)[0] - 1 : 25;
-                int span = 1;
-                if (subRow != null) {
-                    // 先检查合并单元格
-                    for (int mr = 0; mr < sheet.getNumMergedRegions(); mr++) {
-                        org.apache.poi.ss.util.CellRangeAddress region = sheet.getMergedRegion(mr);
-                        if (region.getFirstRow() == subRow.getRowNum()
-                                && region.getFirstColumn() >= colStart
-                                && region.getFirstColumn() <= colEnd) {
-                            int mergedSpan = region.getLastColumn() - region.getFirstColumn() + 1;
-                            if (mergedSpan > span) span = mergedSpan;
+                boolean isLast = (idx + 1 >= shiftPositions.size());
+                int colEnd = !isLast ? shiftPositions.get(idx + 1)[0] - 1 : 25;
+                int span;
+                if (!isLast) {
+                    span = shiftPositions.get(idx + 1)[0] - colStart;
+                } else {
+                    // last shift: find actual span by last "姓名" position
+                    int lastXmCol = colStart;
+                    if (subRow != null) {
+                        for (int c = colStart; c <= 25; c++) {
+                            Cell sc = subRow.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                            if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) lastXmCol = c;
                         }
                     }
-                    // 再数非空单元格（兼容无合并单元格的模板）
-                    int count = 0;
-                    for (int c = colStart; c <= colEnd; c++) {
-                        Cell sc = subRow.getCell(c, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                        if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) count++;
-                    }
-                    if (count > span) span = count;
+                    span = lastXmCol - colStart + 1;
+                    if (span < 1) span = 1;
                 }
+                // 预备列修正：模板检测结果比实际多2列
+                if (name.contains("预备")) span = Math.max(1, span - 2);
                 boolean matched = false;
                 for (Map.Entry<String, String> e : STANDARD_SHIFT_MAP.entrySet()) {
-                    if (name.contains(e.getKey()) && !(e.getKey().equals("半班") && shiftNames.contains("预备"))) {
-                        shiftColMap.put(e.getValue(), new int[]{colStart, colStart + span - 1}); matched = true; break;
+                    if (name.contains(e.getKey())) {
+                        String colKey = e.getValue();
+                        // 半班和预备并存时，半班用独立的banBan字段，避免与预备冲突
+                        if (colKey.equals("yuBei") && name.contains("半班")
+                                && shiftNames.stream().anyMatch(n -> n.contains("预备"))) {
+                            colKey = "banBan";
+                        }
+                        shiftColMap.put(colKey, new int[]{colStart, colStart + span - 1}); matched = true; break;
                     }
                 }
                 if (!matched && name.equals("日勤")) { shiftColMap.put("dailyName", new int[]{colStart, colStart}); matched = true; }
@@ -439,6 +485,7 @@ public class LedgerExportService {
             dataMap.put("yiBan", new String[]{d.getYiBan1(), d.getYiBan2()});
             dataMap.put("bingBan", new String[]{d.getBingBan1(), d.getBingBan2()});
             dataMap.put("dingBan", new String[]{d.getDingBan1(), d.getDingBan2()});
+            dataMap.put("banBan", new String[]{d.getBanBan1(), d.getBanBan2()});
             dataMap.put("yuBei", new String[]{d.getYuBei1(), d.getYuBei2(), d.getYuBei3(), d.getYuBei4()});
             dataMap.put("dailyName", new String[]{d.getDailyName(), null});
             for (Map.Entry<String, int[]> e : shiftColMap.entrySet()) {
@@ -586,6 +633,7 @@ public class LedgerExportService {
                     fillDateRow(workbook, sheet, ledger);
                     mergeBanBieRow(sheet);
                     addBorders(workbook, sheet);
+                    clearTitleBorders(workbook, sheet);
                     setDateLeftAlign(workbook, sheet);
                     workbook.setSheetName(0, sheetName);
                     firstSheet = false;
@@ -597,6 +645,7 @@ public class LedgerExportService {
                         fillDateRow(tplWb, tplSheet, ledger);
                         mergeBanBieRow(tplSheet);
                         addBorders(tplWb, tplSheet);
+                        clearTitleBorders(tplWb, tplSheet);
                         setDateLeftAlign(tplWb, tplSheet);
                         Sheet outSheet = workbook.createSheet(sheetName);
                         copySheetContent(tplSheet, outSheet);
@@ -693,58 +742,56 @@ public class LedgerExportService {
             Row row4 = sheet.getRow(3);
             String[][] standardMapping = {
                 {"甲班", "jiaBan"}, {"乙班", "yiBan"}, {"丙班", "bingBan"}, {"丁班", "dingBan"},
-                {"预备", "yuBei"}, {"半班", "yuBei"},
+                {"预备", "yuBei"}, {"半班", "banBan"},
             };
-            boolean[] standardUsed = new boolean[5];
-            // 先收集所有班次名称，用于判断"半班"与"预备"并存的情况
-            List<String> allShiftNames = new ArrayList<>();
+            boolean[] standardUsed = new boolean[6];
+            boolean hasYuBei = false;
             for (int i = 3; i <= 25; i++) {
                 Cell c = row4.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                if (c != null && c.getCellType() == CellType.STRING && !c.getStringCellValue().isBlank()) allShiftNames.add(c.getStringCellValue().trim());
+                if (c != null && c.getCellType() == CellType.STRING && c.getStringCellValue().trim().contains("预备")) { hasYuBei = true; break; }
             }
-            boolean hasYuBei = allShiftNames.stream().anyMatch(n -> n.contains("预备"));
             for (int i = 3; i <= 25; i++) {
                 Cell c = row4.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                 if (c == null || c.getCellType() != CellType.STRING || c.getStringCellValue().isBlank()) continue;
                 String name = c.getStringCellValue().trim();
                 boolean matched = false;
                 for (String[] mapping : standardMapping) {
-                    if (name.contains(mapping[0]) && !(mapping[0].equals("半班") && hasYuBei)) {
-                        int idx = switch (mapping[1]) {
-                            case "jiaBan" -> 0; case "yiBan" -> 1; case "bingBan" -> 2; case "dingBan" -> 3; case "yuBei" -> 4; default -> -1;
+                    if (name.contains(mapping[0])) {
+                        // 半班和预备并存时，半班用banBan索引（独立字段）；否则半班走yuBei
+                        String colKey = mapping[1];
+                        int idx = switch (colKey) {
+                            case "jiaBan" -> 0; case "yiBan" -> 1; case "bingBan" -> 2;
+                            case "dingBan" -> 3; case "yuBei" -> 4; case "banBan" -> 5; default -> -1;
                         };
+                        if (idx == 5 && !hasYuBei) { colKey = "yuBei"; idx = 4; }
                         if (idx >= 0 && !standardUsed[idx]) {
                             standardUsed[idx] = true;
-                            int cols = 2;
-                            if (mapping[1].equals("yuBei")) {
-                                Row subRow = sheet.getRow(4);
-                                int colEnd2 = 25;
-                                for (int j = i + 1; j <= 25; j++) {
-                                    Cell nc = row4.getCell(j, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                                    if (nc != null && nc.getCellType() == CellType.STRING && !nc.getStringCellValue().isBlank()) { colEnd2 = j - 1; break; }
-                                }
-                                if (subRow != null) {
-                                    // 检查合并单元格
-                                    for (int mr = 0; mr < sheet.getNumMergedRegions(); mr++) {
-                                        org.apache.poi.ss.util.CellRangeAddress region = sheet.getMergedRegion(mr);
-                                        if (region.getFirstRow() == subRow.getRowNum()
-                                                && region.getFirstColumn() >= i
-                                                && region.getFirstColumn() <= colEnd2) {
-                                            int mergedSpan = region.getLastColumn() - region.getFirstColumn() + 1;
-                                            if (mergedSpan > cols) cols = mergedSpan;
-                                        }
-                                    }
-                                    // 再数非空单元格
-                                    int cnt = 0;
-                                    for (int c2 = i; c2 <= colEnd2; c2++) {
-                                        Cell sc = subRow.getCell(c2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                                        if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) cnt++;
-                                    }
-                                    if (cnt > cols) cols = cnt;
-                                }
+                            int colEnd2 = 25;
+                            boolean isLast = true;
+                            for (int j = i + 1; j <= 25; j++) {
+                                Cell nc = row4.getCell(j, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                                if (nc != null && nc.getCellType() == CellType.STRING && !nc.getStringCellValue().isBlank()) { colEnd2 = j - 1; isLast = false; break; }
                             }
+                            // 非末尾：R4间距；末尾：从子行"姓名"位置确定实际范围
+                            int cols;
+                            if (!isLast) {
+                                cols = colEnd2 - i + 1;
+                            } else {
+                                Row subRow = sheet.getRow(4);
+                                int lastXmCol = i;
+                                if (subRow != null) {
+                                    for (int c2 = i; c2 <= 25; c2++) {
+                                        Cell sc = subRow.getCell(c2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                                        if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) lastXmCol = c2;
+                                    }
+                                }
+                                cols = lastXmCol - i + 1;
+                                if (cols < 1) cols = 1;
+                            }
+                            // 预备列修正：模板检测结果比实际多2列
+                            if (name.contains("预备")) cols = Math.max(1, cols - 2);
                             for (int n = 1; n <= cols; n++) {
-                                fields.add(new FieldItem(mapping[1] + n, name, true));
+                                fields.add(new FieldItem(colKey + n, name, true));
                             }
                             matched = true;
                             break;
@@ -769,92 +816,61 @@ public class LedgerExportService {
                 .map(StaffLedgerDetail::getEmployeeBasicId).distinct()
                 .map(id -> employeeBasicMapper.findById(id)).filter(e -> e != null)
                 .collect(Collectors.toMap(EmployeeBasic::getId, e -> e));
-        List<String> extraShiftNames = new ArrayList<>();
+        List<String> headerNames = new ArrayList<>(List.of("岗点", "班组", "岗位"));
+        List<Integer> headerColspans = new ArrayList<>(List.of(1, 1, 1));
+        // 按模板实际顺序构建班次表头（支持行配半班与预备并存）
+        List<int[]> shiftHeaders = new ArrayList<>(); // {0=isStandard, 1=colspan}
         try {
-            File tplFile = findTemplateFile(orgUnit != null ? orgUnit.getOrgName() : "");
-            try (Workbook twb = new XSSFWorkbook(new FileInputStream(tplFile))) {
-                Row r4 = twb.getSheetAt(0).getRow(3);
-                boolean hasYuBei = false;
-                for (int i = 3; i <= 25; i++) {
-                    Cell c = r4.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                    if (c != null && c.getCellType() == CellType.STRING && c.getStringCellValue().trim().contains("预备")) { hasYuBei = true; break; }
-                }
+            File tplFile2 = findTemplateFile(orgUnit != null ? orgUnit.getOrgName() : "");
+            try (Workbook twb2 = new XSSFWorkbook(new FileInputStream(tplFile2))) {
+                Sheet ts2 = twb2.getSheetAt(0);
+                Row r4 = ts2.getRow(3);
+                Row sr2 = ts2.getRow(4);
                 for (int i = 3; i <= 25; i++) {
                     Cell c = r4.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
                     if (c == null || c.getCellType() != CellType.STRING || c.getStringCellValue().isBlank()) continue;
-                    String name = c.getStringCellValue().trim();
-                    boolean standard = false;
-                    for (Map.Entry<String, String> e : STANDARD_SHIFT_MAP.entrySet()) {
-                        if (name.contains(e.getKey()) && !(e.getKey().equals("半班") && hasYuBei)) { standard = true; break; }
+                    String sn = c.getStringCellValue().trim();
+                    int nextCol = 25;
+                    for (int j = i + 1; j <= 25; j++) {
+                        Cell nc = r4.getCell(j, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                        if (nc != null && nc.getCellType() == CellType.STRING && !nc.getStringCellValue().isBlank()) { nextCol = j - 1; break; }
                     }
-                    if (!standard && !name.equals("日勤")) extraShiftNames.add(name);
+                    int cs = 1;
+                    if (sr2 != null) {
+                        for (int mr = 0; mr < ts2.getNumMergedRegions(); mr++) {
+                            org.apache.poi.ss.util.CellRangeAddress region = ts2.getMergedRegion(mr);
+                            if (region.getFirstRow() == sr2.getRowNum()
+                                    && region.getFirstColumn() >= i && region.getFirstColumn() <= nextCol) {
+                                int ms = region.getLastColumn() - region.getFirstColumn() + 1;
+                                if (ms > cs) cs = ms;
+                            }
+                        }
+                        int cnt = 0;
+                        for (int c2 = i; c2 <= nextCol; c2++) {
+                            Cell sc = sr2.getCell(c2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
+                            if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) cnt++;
+                        }
+                        if (cnt > cs) cs = cnt;
+                    }
+                    boolean isStd = false;
+                    for (String[] m : new String[][]{{"甲班","x"},{"乙班","x"},{"丙班","x"},{"丁班","x"},{"预备","x"},{"半班","x"}}) {
+                        if (sn.contains(m[0])) { isStd = true; break; }
+                    }
+                    headerNames.add(sn);
+                    headerColspans.add(cs);
+                    shiftHeaders.add(new int[]{isStd ? 1 : 0, cs});
                 }
             }
         } catch (Exception ignored) {}
-        List<String> headerNames = new ArrayList<>(List.of("岗点", "班组", "岗位"));
-        List<Integer> headerColspans = new ArrayList<>(List.of(1, 1, 1));
-        int yuBeiColspan = 2;
-        for (String sn : List.of("甲班", "乙班", "丙班", "丁班", "预备")) {
-            int cs = 2;
-            if (sn.equals("预备")) {
-                // 从模板检测预备实际列数
-                try {
-                    File tplFile2 = findTemplateFile(orgUnit != null ? orgUnit.getOrgName() : "");
-                    try (Workbook twb2 = new XSSFWorkbook(new FileInputStream(tplFile2))) {
-                        Row r4 = twb2.getSheetAt(0).getRow(3);
-                        Row sr2 = twb2.getSheetAt(0).getRow(4);
-                        for (int i = 3; i <= 25; i++) {
-                            Cell c = r4.getCell(i, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                            if (c == null || c.getCellType() != CellType.STRING || !c.getStringCellValue().trim().contains("预备")) continue;
-                            int colStart = i;
-                            int colEnd = 25;
-                            for (int j = i + 1; j <= 25; j++) {
-                                Cell nc = r4.getCell(j, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                                if (nc != null && nc.getCellType() == CellType.STRING && !nc.getStringCellValue().isBlank()) { colEnd = j - 1; break; }
-                            }
-                            if (sr2 != null) {
-                                // 检查合并单元格
-                                Sheet tplSheet2 = twb2.getSheetAt(0);
-                                for (int mr = 0; mr < tplSheet2.getNumMergedRegions(); mr++) {
-                                    org.apache.poi.ss.util.CellRangeAddress region = tplSheet2.getMergedRegion(mr);
-                                    if (region.getFirstRow() == sr2.getRowNum()
-                                            && region.getFirstColumn() >= colStart
-                                            && region.getFirstColumn() <= colEnd) {
-                                        int mergedSpan = region.getLastColumn() - region.getFirstColumn() + 1;
-                                        if (mergedSpan > cs) cs = mergedSpan;
-                                    }
-                                }
-                                // 再数非空单元格
-                                int cnt = 0;
-                                for (int c2 = colStart; c2 <= colEnd; c2++) {
-                                    Cell sc = sr2.getCell(c2, Row.MissingCellPolicy.RETURN_BLANK_AS_NULL);
-                                    if (sc != null && sc.getCellType() == CellType.STRING && "姓名".equals(sc.getStringCellValue().trim())) cnt++;
-                                }
-                                if (cnt > cs) cs = cnt;
-                            }
-                            break;
-                        }
-                    }
-                } catch (Exception ignored) {}
-                yuBeiColspan = cs;
-            }
-            headerNames.add(sn);
-            headerColspans.add(cs);
-        }
-        for (String en : extraShiftNames) { headerNames.add(en); headerColspans.add(2); }
         headerNames.addAll(List.of("班制", "日勤", "职务"));
         headerColspans.addAll(List.of(1, 1, 1));
         int totalCols = headerColspans.stream().mapToInt(Integer::intValue).sum();
-        int pairCols = 0;
-        for (int i = 0; i < headerColspans.size(); i++) {
-            if (!headerNames.get(i).equals("日勤")) pairCols += headerColspans.get(i);
-        }
-        int hasDaily = headerNames.contains("日勤") ? 1 : 0;
-        int shiftPairCount = pairCols - hasDaily;
+        // 计算班次姓名列总数（用于列宽分配）
+        int nameColCount = shiftHeaders.stream().mapToInt(h -> h[1]).sum();
         float[] colWidths = new float[totalCols];
         colWidths[0] = 6; colWidths[1] = 8; colWidths[2] = 8;
-        for (int i = 3; i < 3 + shiftPairCount * 2; i++) colWidths[i] = 4.5f;
-        for (int i = 3 + shiftPairCount * 2; i < totalCols; i++) colWidths[i] = 5;
+        for (int i = 3; i < 3 + nameColCount; i++) colWidths[i] = 4.5f;
+        for (int i = 3 + nameColCount; i < totalCols; i++) colWidths[i] = 5;
         com.lowagie.text.pdf.PdfPTable table = new com.lowagie.text.pdf.PdfPTable(totalCols);
         table.setWidths(colWidths); table.setWidthPercentage(100);
         com.lowagie.text.pdf.PdfPCell titleCell = makePdfCell((orgUnit != null ? orgUnit.getOrgName() : "") + "  现员分布台账", 12, true, Element.ALIGN_CENTER);
@@ -867,39 +883,48 @@ public class LedgerExportService {
             table.addCell(cell);
         }
         for (int i = 0; i < 3; i++) table.addCell(makePdfCell("", 9, true, Element.ALIGN_CENTER));
-        for (int i = 3; i < headerNames.size(); i++) {
-            int cs = headerColspans.get(i);
-            if (headerNames.get(i).equals("日勤")) {
-                table.addCell(makePdfCell("", 9, true, Element.ALIGN_CENTER));
-            } else {
-                for (int j = 0; j < cs; j++) table.addCell(makePdfCell("姓名", 9, true, Element.ALIGN_CENTER));
-            }
+        // 子表头（班次列填"姓名"，日勤/班制/职务留空）
+        for (int[] sh : shiftHeaders) {
+            for (int j = 0; j < sh[1]; j++) table.addCell(makePdfCell("姓名", 9, true, Element.ALIGN_CENTER));
         }
         table.addCell(makePdfCell("", 9, true, Element.ALIGN_CENTER));
-        table.addCell(makePdfCell("姓名", 9, true, Element.ALIGN_CENTER));
         table.addCell(makePdfCell("", 9, true, Element.ALIGN_CENTER));
+        table.addCell(makePdfCell("", 9, true, Element.ALIGN_CENTER));
+        // 数据行
+        Map<String, String[]> stdDataMap = new HashMap<>();
         for (StaffLedgerDetail d : details) {
             EmployeeBasic emp = empMap.get(d.getEmployeeBasicId());
             table.addCell(makePdfCell(pdfStr(d.getStationPoint()), 8, false, Element.ALIGN_CENTER));
             table.addCell(makePdfCell(pdfStr(d.getTeamName(), emp != null ? emp.getTeamName() : ""), 8, false, Element.ALIGN_CENTER));
             table.addCell(makePdfCell(pdfStr(d.getWorkType(), emp != null ? emp.getWorkType() : ""), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getJiaBan1()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getJiaBan2()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getYiBan1()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getYiBan2()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getBingBan1()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getBingBan2()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getDingBan1()), 8, false, Element.ALIGN_CENTER));
-            table.addCell(makePdfCell(pdfStr(d.getDingBan2()), 8, false, Element.ALIGN_CENTER));
-            String[] yuBeiVals = {d.getYuBei1(), d.getYuBei2(), d.getYuBei3(), d.getYuBei4()};
-            for (int yb = 0; yb < yuBeiColspan && yb < yuBeiVals.length; yb++) {
-                table.addCell(makePdfCell(pdfStr(yuBeiVals[yb]), 8, false, Element.ALIGN_CENTER));
-            }
+            stdDataMap.clear();
+            stdDataMap.put("甲班", new String[]{d.getJiaBan1(), d.getJiaBan2()});
+            stdDataMap.put("乙班", new String[]{d.getYiBan1(), d.getYiBan2()});
+            stdDataMap.put("丙班", new String[]{d.getBingBan1(), d.getBingBan2()});
+            stdDataMap.put("丁班", new String[]{d.getDingBan1(), d.getDingBan2()});
+            stdDataMap.put("预备", new String[]{d.getYuBei1(), d.getYuBei2(), d.getYuBei3(), d.getYuBei4()});
+            stdDataMap.put("半班", new String[]{d.getBanBan1(), d.getBanBan2()});
             Map<String, String[]> jsonData = parseExtraShiftJson(d.getExtraShiftJson());
-            for (String shiftName : extraShiftNames) {
-                String[] vals = jsonData.get(shiftName);
-                table.addCell(makePdfCell(pdfStr(vals != null ? vals[0] : ""), 8, false, Element.ALIGN_CENTER));
-                table.addCell(makePdfCell(pdfStr(vals != null ? vals[1] : ""), 8, false, Element.ALIGN_CENTER));
+            for (int si = 0; si < shiftHeaders.size(); si++) {
+                String sn = headerNames.get(3 + si);
+                int cs = shiftHeaders.get(si)[1];
+                if (shiftHeaders.get(si)[0] == 1) {
+                    // 标准班次：从stdDataMap取值
+                    String stdKey = null;
+                    for (String[] m : new String[][]{{"甲班","甲班"},{"乙班","乙班"},{"丙班","丙班"},{"丁班","丁班"},{"预备","预备"},{"半班","半班"}}) {
+                        if (sn.contains(m[0])) { stdKey = m[1]; break; }
+                    }
+                    String[] vals = stdKey != null ? stdDataMap.get(stdKey) : null;
+                    for (int j = 0; j < cs; j++) {
+                        table.addCell(makePdfCell(pdfStr(vals != null && j < vals.length ? vals[j] : ""), 8, false, Element.ALIGN_CENTER));
+                    }
+                } else {
+                    // 额外班次：从JSON取值
+                    String[] vals = jsonData.get(sn);
+                    if (vals == null) vals = jsonData.get("extra:" + sn);
+                    table.addCell(makePdfCell(pdfStr(vals != null ? vals[0] : ""), 8, false, Element.ALIGN_CENTER));
+                    if (cs > 1) table.addCell(makePdfCell(pdfStr(vals != null && vals.length > 1 ? vals[1] : ""), 8, false, Element.ALIGN_CENTER));
+                }
             }
             table.addCell(makePdfCell(pdfStr(d.getShiftCategory()), 8, false, Element.ALIGN_CENTER));
             table.addCell(makePdfCell(pdfStr(d.getDailyName()), 8, false, Element.ALIGN_CENTER));

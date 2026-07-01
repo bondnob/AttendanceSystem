@@ -18,4 +18,10 @@ public interface LedgerConfigMapper {
 
     @Update("UPDATE ledger_config SET config_value = #{configValue}, updated_at = CURRENT_TIMESTAMP WHERE config_key = #{configKey}")
     int updateValue(@Param("configKey") String configKey, @Param("configValue") String configValue);
+
+    @Update("INSERT INTO ledger_config (config_key, config_value) VALUES (#{configKey}, #{configValue}) ON DUPLICATE KEY UPDATE config_value = #{configValue}, updated_at = CURRENT_TIMESTAMP")
+    int upsert(@Param("configKey") String configKey, @Param("configValue") String configValue);
+
+    @Update("DELETE FROM ledger_config WHERE config_key = #{configKey}")
+    int deleteByKey(@Param("configKey") String configKey);
 }

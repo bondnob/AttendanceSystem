@@ -14,6 +14,7 @@ import com.attendance.ledger.dto.LedgerPendingResponse;
 import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerRequest;
 import com.attendance.ledger.dto.ShareLedgerRequest;
+import com.attendance.ledger.dto.ShareEmployeeBasicRequest;
 import com.attendance.ledger.dto.SubmitLedgerRequest;
 import com.attendance.ledger.dto.TemplateFieldsResponse;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
@@ -265,6 +266,60 @@ public class StaffLedgerController {
         return ApiResponse.success("撤销成功", null);
     }
 
+    // ==================== 现员基础表共享相关 ====================
+
+    @Operation(summary = "共享现员基础表给领导", description = "劳动人事科将指定部门的现员基础表共享给指定领导查看。")
+    @PostMapping("/basic/share")
+    public ApiResponse<Void> shareEmployeeBasic(@Valid @RequestBody ShareEmployeeBasicRequest request) {
+        staffLedgerService.shareEmployeeBasic(request);
+        return ApiResponse.success("共享成功", null);
+    }
+
+    @Operation(summary = "撤销现员基础表共享", description = "劳动人事科撤销对指定领导的现员基础表共享。")
+    @DeleteMapping("/basic/share")
+    public ApiResponse<Void> revokeEmployeeBasicSharing(@RequestParam Long orgUnitId, @RequestParam Long targetUserId) {
+        staffLedgerService.revokeEmployeeBasicSharing(orgUnitId, targetUserId);
+        return ApiResponse.success("撤销成功", null);
+    }
+
+    @Operation(summary = "查看现员基础表共享列表", description = "查看某个部门的现员基础表被共享给了哪些领导。不传 orgUnitId 时仅返回默认权限（劳动人事科科长及考勤管理员）。")
+    @GetMapping("/basic/shares")
+    public ApiResponse<List<Map<String, Object>>> getEmployeeBasicShares(@RequestParam(required = false) Long orgUnitId) {
+        return ApiResponse.success(staffLedgerService.getEmployeeBasicSharesByOrgUnit(orgUnitId));
+    }
+
+    // ==================== 领导页面访问权限 ====================
+
+    @Operation(summary = "设置领导现员数据页面访问权限")
+    @PostMapping("/basic/share/access")
+    public ApiResponse<Void> setLeaderEmployeePageAccess(@RequestBody Map<String, Object> body) {
+        List<Long> targetUserIds = parseTargetUserIds(body);
+        boolean visible = parseVisible(body);
+        staffLedgerService.setLeaderEmployeePageAccess(targetUserIds, visible);
+        return ApiResponse.success("设置成功", null);
+    }
+
+    @Operation(summary = "获取有现员数据页面访问权限的领导列表")
+    @GetMapping("/basic/share/access")
+    public ApiResponse<List<AttendanceAdminResponse>> getLeaderEmployeePageAccess() {
+        return ApiResponse.success(staffLedgerService.getLeaderEmployeePageAccess());
+    }
+
+    @Operation(summary = "设置领导台账页面访问权限")
+    @PostMapping("/share/access")
+    public ApiResponse<Void> setLeaderLedgerPageAccess(@RequestBody Map<String, Object> body) {
+        List<Long> targetUserIds = parseTargetUserIds(body);
+        boolean visible = parseVisible(body);
+        staffLedgerService.setLeaderLedgerPageAccess(targetUserIds, visible);
+        return ApiResponse.success("设置成功", null);
+    }
+
+    @Operation(summary = "获取有台账页面访问权限的领导列表")
+    @GetMapping("/share/access")
+    public ApiResponse<List<AttendanceAdminResponse>> getLeaderLedgerPageAccess() {
+        return ApiResponse.success(staffLedgerService.getLeaderLedgerPageAccess());
+    }
+
     // ==================== 动态路径接口（/{id} 放在最后） ====================
 
     @Operation(summary = "获取台账详情")
@@ -372,17 +427,24 @@ public class StaffLedgerController {
         return ApiResponse.success("台账数据导入成功", null);
     }
 
-    @Operation(summary = "按模板导出台账Excel", description = "使用各车间专属模板填充数据后导出，保留原始模板格式。")
-    @GetMapping("/{id}/template-excel")
-    public ResponseEntity<byte[]> exportLedgerTemplateExcel(@PathVariable Long id) {
+    @Operation(summary = "按模板导出台账Excel", description = "根据部门ID和月份导出台账，月份默认当月。")
+    @GetMapping("/template-excel")
+    public ResponseEntity<byte[]> exportLedgerTemplateExcel(@RequestParam Long orgUnitId,
+                                                            @RequestParam(required = false) String month) {
         try {
-            byte[] data = ledgerExportService.fillTemplateExcel(id);
+            String effectiveMonth = month != null && !month.isBlank() ? month : LocalDate.now().toString().substring(0, 7);
+            StaffLedger ledger = staffLedgerMapper.findByOrgUnitAndMonth(orgUnitId, effectiveMonth);
+            if (ledger == null)
+                return ResponseEntity.badRequest()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .body(("该部门" + effectiveMonth + "台账不存在").getBytes(StandardCharsets.UTF_8));
+            byte[] data = ledgerExportService.fillTemplateExcel(ledger.getId());
             String filename = URLEncoder.encode("现员分布台账_模板.xlsx", StandardCharsets.UTF_8).replace("+", "%20");
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + filename)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")).body(data);
         } catch (Exception e) {
-            log.error("按模板导出台账Excel失败, ledgerId={}", id, e);
+            log.error("按模板导出台账Excel失败, orgUnitId={}, month={}", orgUnitId, month, e);
             return ResponseEntity.internalServerError()
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(("导出失败: " + e.getMessage()).getBytes(StandardCharsets.UTF_8));
@@ -405,5 +467,29 @@ public class StaffLedgerController {
     @GetMapping("/{id}/compare")
     public ApiResponse<LedgerMonthCompareResponse> compareWithPreviousMonth(@PathVariable Long id) {
         return ApiResponse.success(staffLedgerService.compareWithPreviousMonth(id));
+    }
+
+    // ==================== 辅助方法 ====================
+
+    @SuppressWarnings("unchecked")
+    private List<Long> parseTargetUserIds(Map<String, Object> body) {
+        Object raw = body.get("targetUserIds");
+        if (raw == null) {
+            return List.of();
+        }
+        if (raw instanceof List) {
+            return ((List<?>) raw).stream()
+                    .map(item -> item instanceof Number ? ((Number) item).longValue() : Long.parseLong(item.toString()))
+                    .collect(Collectors.toList());
+        }
+        return List.of();
+    }
+
+    private boolean parseVisible(Map<String, Object> body) {
+        Object raw = body.get("visible");
+        if (raw instanceof Boolean) {
+            return (Boolean) raw;
+        }
+        return true;
     }
 }

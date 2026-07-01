@@ -20,15 +20,18 @@ import com.attendance.ledger.dto.LedgerResponse;
 import com.attendance.ledger.dto.SaveLedgerDetailRequest;
 import com.attendance.ledger.dto.SaveLedgerRequest;
 import com.attendance.ledger.dto.ShareLedgerRequest;
+import com.attendance.ledger.dto.ShareEmployeeBasicRequest;
 import com.attendance.ledger.dto.SubmitLedgerRequest;
 import com.attendance.ledger.dto.UpdateEmployeeBasicRequest;
 import com.attendance.ledger.mapper.EmployeeBasicMapper;
+import com.attendance.ledger.mapper.EmployeeBasicShareMapper;
 import com.attendance.ledger.mapper.EmployeeBasicSubmissionMapper;
 import com.attendance.ledger.mapper.LedgerApprovalRecordMapper;
 import com.attendance.ledger.mapper.LedgerConfigMapper;
 import com.attendance.ledger.mapper.StaffLedgerDetailMapper;
 import com.attendance.ledger.mapper.StaffLedgerMapper;
 import com.attendance.ledger.model.EmployeeBasic;
+import com.attendance.ledger.model.EmployeeBasicShare;
 import com.attendance.ledger.model.EmployeeBasicSubmission;
 import com.attendance.ledger.model.LedgerApprovalRecord;
 import com.attendance.ledger.model.LedgerConfig;
@@ -86,6 +89,7 @@ public class StaffLedgerService {
     );
 
     private final EmployeeBasicMapper employeeBasicMapper;
+    private final EmployeeBasicShareMapper employeeBasicShareMapper;
     private final EmployeeBasicSubmissionMapper employeeBasicSubmissionMapper;
     private final StaffLedgerMapper staffLedgerMapper;
     private final StaffLedgerDetailMapper staffLedgerDetailMapper;
@@ -235,24 +239,70 @@ public class StaffLedgerService {
         int offset = (safePageNum - 1) * safePageSize;
         boolean hasFilter = (categoryMajor != null && !categoryMajor.isBlank()) || retirementAge != null;
 
-        Long queryOrgId = orgUnitId != null ? orgUnitId : currentUser.getOrgUnitId();
+        // 系统管理员：未指定orgUnitId时看全部
+        if (isSystemAdmin(currentUser) && orgUnitId == null && !hasFilter) {
+            long total = employeeBasicMapper.countAll();
+            List<EmployeeBasic> list = employeeBasicMapper.findAllWithPage(offset, safePageSize);
+            List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
+            return PageResponse.<EmployeeBasicResponse>builder()
+                    .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records).build();
+        }
+        if (isSystemAdmin(currentUser) && orgUnitId == null) {
+            long total = employeeBasicMapper.countFiltered(null, categoryMajor, retirementAge);
+            List<EmployeeBasic> list = total > 0 ? employeeBasicMapper.findFilteredWithPage(null, categoryMajor, retirementAge, offset, safePageSize) : List.of();
+            List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
+            return PageResponse.<EmployeeBasicResponse>builder()
+                    .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records).build();
+        }
+
+        // 指定orgUnitId：校验是否为本部门或已共享
+        if (orgUnitId != null) {
+            if (!orgUnitId.equals(currentUser.getOrgUnitId())
+                    && !isSystemAdmin(currentUser) && !isHrAdmin(currentUser)
+                    && employeeBasicShareMapper.countByOrgUnitAndUser(orgUnitId, currentUser.getUserId()) == 0) {
+                throw new BizException("无权查看该部门现员基础表");
+            }
+            long total;
+            List<EmployeeBasic> list;
+            if (hasFilter) {
+                total = employeeBasicMapper.countFiltered(orgUnitId, categoryMajor, retirementAge);
+                list = total > 0 ? employeeBasicMapper.findFilteredWithPage(orgUnitId, categoryMajor, retirementAge, offset, safePageSize) : List.of();
+            } else {
+                total = employeeBasicMapper.countDistributedByOrgUnitId(orgUnitId);
+                list = total > 0 ? employeeBasicMapper.findDistributedByOrgUnitIdWithPage(orgUnitId, offset, safePageSize) : List.of();
+            }
+            List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
+            return PageResponse.<EmployeeBasicResponse>builder()
+                    .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records).build();
+        }
+
+        // 未指定orgUnitId：本部门 + 已共享的部门
+        List<Long> accessibleOrgUnitIds = new ArrayList<>();
+        if (currentUser.getOrgUnitId() != null) {
+            accessibleOrgUnitIds.add(currentUser.getOrgUnitId());
+        }
+        List<Long> sharedIds = employeeBasicShareMapper.findSharedOrgUnitIdsByUserId(currentUser.getUserId());
+        if (sharedIds != null) {
+            for (Long sid : sharedIds) {
+                if (!accessibleOrgUnitIds.contains(sid)) {
+                    accessibleOrgUnitIds.add(sid);
+                }
+            }
+        }
+        if (accessibleOrgUnitIds.isEmpty()) {
+            return PageResponse.<EmployeeBasicResponse>builder()
+                    .total(0L).pageNum(safePageNum).pageSize(safePageSize).records(List.of()).build();
+        }
 
         long total;
         List<EmployeeBasic> list;
-        if (isSystemAdmin(currentUser) && orgUnitId == null && !hasFilter) {
-            total = employeeBasicMapper.countAll();
-            list = employeeBasicMapper.findAllWithPage(offset, safePageSize);
-        } else if (isSystemAdmin(currentUser) && orgUnitId == null) {
-            total = employeeBasicMapper.countFiltered(null, categoryMajor, retirementAge);
-            list = total > 0 ? employeeBasicMapper.findFilteredWithPage(null, categoryMajor, retirementAge, offset, safePageSize) : List.of();
-        } else if (hasFilter) {
-            total = employeeBasicMapper.countFiltered(queryOrgId, categoryMajor, retirementAge);
-            list = total > 0 ? employeeBasicMapper.findFilteredWithPage(queryOrgId, categoryMajor, retirementAge, offset, safePageSize) : List.of();
+        if (hasFilter) {
+            total = employeeBasicMapper.countFilteredByOrgUnitIds(accessibleOrgUnitIds, categoryMajor, retirementAge);
+            list = total > 0 ? employeeBasicMapper.findFilteredByOrgUnitIdsWithPage(accessibleOrgUnitIds, categoryMajor, retirementAge, offset, safePageSize) : List.of();
         } else {
-            total = employeeBasicMapper.countDistributedByOrgUnitId(queryOrgId);
-            list = total > 0 ? employeeBasicMapper.findDistributedByOrgUnitIdWithPage(queryOrgId, offset, safePageSize) : List.of();
+            total = employeeBasicMapper.countByOrgUnitIds(accessibleOrgUnitIds);
+            list = total > 0 ? employeeBasicMapper.findByOrgUnitIdsWithPage(accessibleOrgUnitIds, offset, safePageSize) : List.of();
         }
-
         List<EmployeeBasicResponse> records = list.stream().map(this::toEmployeeBasicResponse).collect(Collectors.toList());
         return PageResponse.<EmployeeBasicResponse>builder()
                 .total(total).pageNum(safePageNum).pageSize(safePageSize).records(records).build();
@@ -413,6 +463,10 @@ public class StaffLedgerService {
                         fieldKey = e.getValue(); break;
                     }
                 }
+                // 半班和预备并存时，半班用独立的banBan字段，避免与预备冲突
+                if (fieldKey == null && name.contains("半班") && hasYuBei) {
+                    fieldKey = "banBan";
+                }
                 shifts.add(new ShiftInfo(colStart, span, name, fieldKey));
             }
 
@@ -475,6 +529,10 @@ public class StaffLedgerService {
                                 if (vals.length > 1) detail.setYuBei2(vals[1]);
                                 if (vals.length > 2) detail.setYuBei3(vals[2]);
                                 if (vals.length > 3) detail.setYuBei4(vals[3]);
+                            }
+                            case "banBan" -> {
+                                detail.setBanBan1(vals[0]);
+                                if (vals.length > 1) detail.setBanBan2(vals[1]);
                             }
                         }
                     } else {
@@ -792,11 +850,13 @@ public class StaffLedgerService {
         List<LedgerMonthCompareResponse.CompareItem> differences = new ArrayList<>();
         List<StaffLedgerDetail> currentDetails = staffLedgerDetailMapper.findByLedgerId(ledgerId);
         Map<Long, StaffLedgerDetail> currentMap = currentDetails.stream()
+                .filter(d -> d.getEmployeeBasicId() != null)
                 .collect(Collectors.toMap(StaffLedgerDetail::getEmployeeBasicId, d -> d));
 
         if (previousLedger != null) {
             List<StaffLedgerDetail> previousDetails = staffLedgerDetailMapper.findByLedgerId(previousLedger.getId());
             Map<Long, StaffLedgerDetail> previousMap = previousDetails.stream()
+                    .filter(d -> d.getEmployeeBasicId() != null)
                     .collect(Collectors.toMap(StaffLedgerDetail::getEmployeeBasicId, d -> d));
 
             for (StaffLedgerDetail curr : currentDetails) {
@@ -862,7 +922,7 @@ public class StaffLedgerService {
             return AttendanceAdminResponse.builder()
                     .userId(a.getId())
                     .empName(a.getEmpName())
-                    .roleName(a.getRoleName())
+                    .roleName(a.getEmpName())
                     .orgUnitId(a.getOrgUnitId())
                     .orgUnitName(org != null ? org.getOrgName() : "")
                     .build();
@@ -1145,5 +1205,175 @@ public class StaffLedgerService {
     private void requireSystemAdmin() {
         CurrentUser currentUser = UserContext.get();
         if (currentUser == null || !"SYSTEM_ADMIN".equals(currentUser.getRoleCode())) throw new BizException("只有超级管理员可以执行该操作");
+    }
+
+    // ==================== 现员基础表共享相关 ====================
+
+    @Transactional
+    public void shareEmployeeBasic(ShareEmployeeBasicRequest request) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以共享现员基础表");
+        }
+        for (Long orgUnitId : request.getOrgUnitIds()) {
+            OrgUnit org = orgUnitMapper.findById(orgUnitId);
+            if (org == null) throw new BizException("组织单位不存在: " + orgUnitId);
+            for (Long targetUserId : request.getTargetUserIds()) {
+                UserAccount targetUser = userAccountMapper.findById(targetUserId);
+                if (targetUser == null) throw new BizException("用户不存在: " + targetUserId);
+                if (!SHAREABLE_LEADER_ROLES.contains(targetUser.getRoleCode())) {
+                    throw new BizException("只能共享给领导角色: " + targetUser.getEmpName());
+                }
+                if (employeeBasicShareMapper.countByOrgUnitAndUser(orgUnitId, targetUserId) == 0) {
+                    EmployeeBasicShare share = new EmployeeBasicShare();
+                    share.setOrgUnitId(orgUnitId);
+                    share.setSharedUserId(targetUserId);
+                    employeeBasicShareMapper.insert(share);
+                }
+            }
+        }
+    }
+
+    @Transactional
+    public void revokeEmployeeBasicSharing(Long orgUnitId, Long targetUserId) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以撤销现员基础表共享");
+        }
+        employeeBasicShareMapper.deleteByOrgUnitAndUser(orgUnitId, targetUserId);
+    }
+
+    public List<Map<String, Object>> getEmployeeBasicSharesByOrgUnit(Long orgUnitId) {
+        requireLogin();
+        OrgUnit org = orgUnitId != null ? orgUnitMapper.findById(orgUnitId) : null;
+
+        // 默认包含劳动人事科科长和劳动人事科考勤管理员
+        java.util.LinkedHashSet<Long> allUserIds = new java.util.LinkedHashSet<>();
+        for (UserAccount u : userAccountMapper.findEnabledByRole(RoleCode.HR_SECTION_CHIEF)) {
+            allUserIds.add(u.getId());
+        }
+        for (UserAccount u : userAccountMapper.findEnabledByRole(RoleCode.ATTENDANCE_ADMIN)) {
+            if (u.getOrgUnitId() != null && isHrOrg(u.getOrgUnitId())) {
+                allUserIds.add(u.getId());
+            }
+        }
+
+        // 加上数据库中显式共享的用户
+        List<EmployeeBasicShare> shares = orgUnitId != null
+                ? employeeBasicShareMapper.findByOrgUnitId(orgUnitId)
+                : java.util.Collections.emptyList();
+        for (EmployeeBasicShare s : shares) {
+            allUserIds.add(s.getSharedUserId());
+        }
+        
+        return allUserIds.stream()
+                .map(uid -> {
+                    UserAccount user = userAccountMapper.findById(uid);
+                    if (user == null) return null;
+                    Map<String, Object> map = new LinkedHashMap<>();
+                    map.put("orgUnitId", orgUnitId);
+                    map.put("orgUnitName", org != null ? org.getOrgName() : "");
+                    map.put("sharedUserId", uid);
+                    map.put("sharedUserName", user.getEmpName());
+                    // 查找是否有对应的共享记录，获取创建时间
+                    EmployeeBasicShare share = shares.stream()
+                            .filter(s -> s.getSharedUserId().equals(uid))
+                            .findFirst()
+                            .orElse(null);
+                    map.put("createdAt", share != null ? share.getCreatedAt() : null);
+                    map.put("isDefault", share == null); // 标记是否为默认权限
+                    return map;
+                })
+                .filter(m -> m != null)
+                .collect(Collectors.toList());
+    }
+
+    // ==================== 领导页面访问权限 ====================
+
+    private static final String CONFIG_KEY_EMPLOYEE_PAGE_ACCESS = "leader_employee_page_access";
+    private static final String CONFIG_KEY_LEDGER_PAGE_ACCESS = "leader_ledger_page_access";
+
+    public void setLeaderEmployeePageAccess(List<Long> targetUserIds, boolean visible) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以设置页面访问权限");
+        }
+        validateTargetUsers(targetUserIds);
+        updatePageAccessConfig(CONFIG_KEY_EMPLOYEE_PAGE_ACCESS, targetUserIds, visible);
+    }
+
+    public List<AttendanceAdminResponse> getLeaderEmployeePageAccess() {
+        return getLeaderPageAccess(CONFIG_KEY_EMPLOYEE_PAGE_ACCESS);
+    }
+
+    public void setLeaderLedgerPageAccess(List<Long> targetUserIds, boolean visible) {
+        CurrentUser currentUser = requireLogin();
+        if (!isSystemAdmin(currentUser) && !isHrAdmin(currentUser)) {
+            throw new BizException("只有劳动人事科可以设置页面访问权限");
+        }
+        validateTargetUsers(targetUserIds);
+        updatePageAccessConfig(CONFIG_KEY_LEDGER_PAGE_ACCESS, targetUserIds, visible);
+    }
+
+    public List<AttendanceAdminResponse> getLeaderLedgerPageAccess() {
+        return getLeaderPageAccess(CONFIG_KEY_LEDGER_PAGE_ACCESS);
+    }
+
+    private List<AttendanceAdminResponse> getLeaderPageAccess(String configKey) {
+        requireLogin();
+        java.util.LinkedHashSet<Long> allIds = new java.util.LinkedHashSet<>();
+        for (Long uid : getUserIdsFromConfig(configKey)) {
+            allIds.add(uid);
+        }
+        return allIds.stream()
+                .map(uid -> userAccountMapper.findById(uid))
+                .filter(u -> u != null)
+                .map(u -> {
+                    OrgUnit org = orgUnitMapper.findById(u.getOrgUnitId());
+                    return AttendanceAdminResponse.builder()
+                            .userId(u.getId()).empName(u.getEmpName()).roleCode(u.getRoleCode())
+                            .orgUnitId(u.getOrgUnitId())
+                            .orgUnitName(org != null ? org.getOrgName() : "")
+                            .build();
+                })
+                .collect(Collectors.toList());
+    }
+
+    private void validateTargetUsers(List<Long> targetUserIds) {
+        if (targetUserIds != null) {
+            for (Long uid : targetUserIds) {
+                UserAccount user = userAccountMapper.findById(uid);
+                if (user == null) throw new BizException("用户不存在: " + uid);
+            }
+        }
+    }
+
+    private List<Long> getUserIdsFromConfig(String configKey) {
+        LedgerConfig config = ledgerConfigMapper.findByKey(configKey);
+        if (config == null || config.getConfigValue() == null || config.getConfigValue().isBlank()) {
+            return List.of();
+        }
+        List<Long> ids = new ArrayList<>();
+        for (String s : config.getConfigValue().split(",")) {
+            try { ids.add(Long.parseLong(s.trim())); } catch (NumberFormatException ignored) {}
+        }
+        return ids;
+    }
+
+    private void updatePageAccessConfig(String configKey, List<Long> targetUserIds, boolean visible) {
+        List<Long> current = new ArrayList<>(getUserIdsFromConfig(configKey));
+        if (visible) {
+            for (Long uid : targetUserIds) {
+                if (!current.contains(uid)) current.add(uid);
+            }
+        } else {
+            current.removeAll(targetUserIds);
+        }
+        if (current.isEmpty()) {
+            ledgerConfigMapper.deleteByKey(configKey);
+        } else {
+            String value = current.stream().map(String::valueOf).collect(Collectors.joining(","));
+            ledgerConfigMapper.upsert(configKey, value);
+        }
     }
 }

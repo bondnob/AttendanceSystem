@@ -1135,6 +1135,20 @@ INSERT INTO `employee_basic` VALUES (827, '139354702813935470', '时迁', '男',
 INSERT INTO `employee_basic` VALUES (828, '462687035146268703', '段景住', '男', '2004.8.119', 46, '售票值班员', NULL, '工人', '非在岗职工', '长期病假', '小四班', '否', 16, '下行减速顶维修', 1, 'BATCH_1779373877722', 1, NULL, NULL, '2026-05-21 22:31:17', '2026-05-28 22:35:17');
 
 -- ----------------------------
+-- Table structure for employee_basic_share
+-- ----------------------------
+DROP TABLE IF EXISTS `employee_basic_share`;
+CREATE TABLE `employee_basic_share`  (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `org_unit_id` bigint NOT NULL COMMENT '被共享的科室车间ID',
+  `shared_user_id` bigint NOT NULL COMMENT '被共享的领导用户ID',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '共享时间',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE INDEX `uk_org_user`(`org_unit_id`, `shared_user_id`),
+  CONSTRAINT `fk_ebs_org_unit` FOREIGN KEY (`org_unit_id`) REFERENCES `org_unit` (`id`) ON DELETE CASCADE
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '现员基础表共享记录' ROW_FORMAT = Dynamic;
+
+-- ----------------------------
 -- Table structure for employee_basic_submission
 -- ----------------------------
 DROP TABLE IF EXISTS `employee_basic_submission`;
@@ -1564,6 +1578,8 @@ CREATE TABLE `staff_ledger_detail`  (
   `bing_ban2` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '丙班2',
   `ding_ban1` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '丁班1',
   `ding_ban2` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '丁班2',
+  `ban_ban1` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '半班姓名1（行配半班，与预备并存时使用）',
+  `ban_ban2` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '半班姓名2（行配半班，与预备并存时使用）',
   `yu_bei1` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '预备1',
   `yu_bei2` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '预备2',
   `yu_bei3` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT NULL COMMENT '预备3',
